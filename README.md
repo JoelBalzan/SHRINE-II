@@ -38,9 +38,6 @@ python python/maximise_structure.py -l <label> -t 25 -d <DM> -f <f0 MHz> -s
 
 # S/N maximisation, on its own (as SHRINE's maximise_sn.py)
 python python/maximise_sn.py -l <label> -t 25 -s
-
-# Both, and the comparison plot (as SHRINE's structure_SN_comparison.py)
-python python/structure_SN_comparison.py -l <label> -t 25 -i_st <row> -i_sn <row> -d <label>_DMs.npy -s <label>_I_smooth_25us.npy
 ```
 
 Or in one go from the voltages with `optimise_dm.py`:
@@ -49,7 +46,7 @@ Or in one go from the voltages with `optimise_dm.py`:
 # Structure maximisation, refining the trial DMs until they are fine enough
 python python/optimise_dm.py -l <label> -d <DM> -L -1 -H 1 --dDM_auto -t 25 -f <f0 MHz> -I <I file> -s
 
-# ... with the S/N-maximising DM and the comparison plot too (as SHRINE's --do_sn)
+# ... with the S/N-maximising DM too (as SHRINE's --do_sn)
 python python/optimise_dm.py -l <label> -d <DM> -L -1 -H 1 --dDM_auto -t 25 -f <f0 MHz> -I <I file> --do_sn -s
 
 # S/N maximisation only, on the trial DMs given (for very low S/N bursts)
@@ -61,8 +58,7 @@ python python/optimise_dm.py -l <label> -d <DM> -L -1 -H 1 --dDM 0.01 -t 25 -f <
 | `generate_profiles.py` | `{label}_X_t_{DM}.npy`, `{label}_Y_t_{DM}.npy`, the `-I` file (for the crop) | `{label}_DMs.npy/.dat`, `{label}_I_{dt}us.npy/.dat`, `{label}_zap.txt` (the zapped channels), `{label}_profile_summaryfile.txt` |
 | `maximise_structure.py` | `{label}_DMs.npy`, `{label}_I_{dt}us.npy` | `{label}_structure_summaryfile.txt`, `{label}_SPs.dat`, `{label}_I_smooth_{dt}us.npy`; with `-s`, `DM.txt` and plots |
 | `maximise_sn.py` | `{label}_DMs.npy`, `{label}_I_{dt}us.npy` | `{label}_SN_summaryfile.txt`, `{label}_SN_DMs.dat`, `{label}_SN.png`, `{label}_Max_SN_window.png`, `{label}_{dt}us_I_SN_max.png`; with `-s`, `{label}_I_smooth.npy` and `DM.txt` |
-| `structure_SN_comparison.py` | the trial DMs and smoothed profiles given | `{label}_structure_SN_comparison.png` |
-| `optimise_dm.py` | as `generate_profiles.py` | as `generate_profiles.py` and `maximise_structure.py`, for the last pass; earlier passes' profiles with `_pass<n>`; with `--do_sn`, as `maximise_sn.py` (on pass 1) and the comparison plot; with `--sn_only`, as `generate_profiles.py` and `maximise_sn.py` only |
+| `optimise_dm.py` | as `generate_profiles.py` | as `generate_profiles.py` and `maximise_structure.py`, for the last pass; earlier passes' profiles with `_pass<n>`; with `--do_sn`, as `maximise_sn.py` (on pass 1); with `--sn_only`, as `generate_profiles.py` and `maximise_sn.py` only |
 
 Flags are SHRINE's, with these additions and changes:
 

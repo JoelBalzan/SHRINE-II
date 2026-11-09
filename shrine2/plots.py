@@ -168,29 +168,3 @@ def plot_sn_window(Sx, start, length, dt, path):
     fig.tight_layout()
     fig.savefig(path)
     plt.close(fig)
-
-
-def plot_structure_sn(Sx, d, i_st, i_sn, dt, path):
-    """Smoothed profiles at the structure- and S/N-maximising DMs (SHRINE's
-    {label}_structure_SN_comparison.png).
-
-    Args:
-        Sx: smoothed profiles S x, shape (n_d, N).
-        d: the trial DMs, shape (n_d,), pc cm^-3.
-        i_st, i_sn: rows of the structure- and S/N-maximising DMs.
-        dt: time resolution, us.
-        path: output file name.
-    """
-    t_ms = np.arange(Sx.shape[1]) * dt / 1000
-    label_st = f"Structure Maximised\n($\\Delta$DM = {d[i_st]:.5g})"
-    label_sn = f"S/N Maximised\n($\\Delta$DM = {d[i_sn]:.5g})"
-
-    fig, ax = plt.subplots(figsize=(6, 3.5))
-    ax.plot(t_ms, Sx[i_st], color="blue", label=label_st)
-    ax.plot(t_ms, Sx[i_sn], "--", color="red", label=label_sn)
-    ax.set_xlabel("Time (ms)")
-    ax.set_ylabel("I")
-    ax.legend()
-    fig.tight_layout()
-    fig.savefig(path)
-    plt.close(fig)

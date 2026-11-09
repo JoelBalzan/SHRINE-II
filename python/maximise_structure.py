@@ -11,7 +11,7 @@ Outputs
     {label}_structure_summaryfile.txt    k_c, d_fit +- sigma_DM, Sp_max +- sigma_S, diagnostics and
                                          warnings
     {label}_SPs.dat                      the structure parameter at each trial delta-DM
-    {label}_I_smooth_{dt}us.npy          the smoothed profiles S x (for structure_SN_comparison.py)
+    {label}_I_smooth_{dt}us.npy          the smoothed profiles S x (as SHRINE)
     with -s: DM.txt and plots ({label}_{dt}us_*.png)
 """
 import sys
@@ -186,7 +186,7 @@ def write_outputs(res, I, args, kc_note, warnings, grid, zap):
     """
     np.savetxt(f"{args.label}_SPs.dat", res["Sp"])
 
-    # As SHRINE, for structure_SN_comparison.py.
+    # The smoothed profiles, as SHRINE writes them.
     np.save(f"{args.label}_I_smooth_{args.dt}us.npy", smooth(I, res["kc"]))
 
     write_summary(f"{args.label}_structure_summaryfile.txt", res, args.label, args.dt, args.DM,

@@ -10,8 +10,7 @@ estimate is repeated, up to --max_passes passes.
 Takes the flags of both scripts. Writes the outputs of maximise_structure.py for the last pass,
 the final I(DM, t) as generate_profiles.py would, and each earlier pass's I(DM, t) with a
 _pass<n> suffix. With --do_sn, also finds the S/N-maximising DM (maximise_sn.py) on the pass-1
-trial DMs, which are the widest, and plots the smoothed profiles at both DMs
-({label}_structure_SN_comparison.png).
+trial DMs, which are the widest.
 
 With --sn_only, finds only the S/N-maximising DM, on the trial DMs given (no structure
 maximisation and no refinement): the standalone S/N mode, for very low S/N bursts.
@@ -31,7 +30,7 @@ from maximise_sn import print_result as print_sn_result
 from maximise_sn import write_outputs as write_sn_outputs
 from maximise_structure import choose_kc_from_flags, estimate, low_sn_warnings
 from maximise_structure import write_outputs as write_structure_outputs
-from shrine2 import check_grid, plots
+from shrine2 import check_grid
 from shrine2.profiles import crop, make_profiles, zapped_channels
 from shrine2.snr import maximise_sn
 
@@ -125,16 +124,6 @@ def main():
     if args.do_sn:
         sn = maximise_sn(I_pass1, d_pass1, res["kc"], args.dt)
         write_sn_outputs(sn, I_pass1, args.label, args.dt, args.save_all)
-
-        # The pass-1 row nearest the structure-maximising DM, for the comparison plot.
-        if res["ok"]:
-            d_structure = res["d_fit"]
-        else:
-            d_structure = res["d_max"]
-        i_st = int(np.argmin(np.abs(d_pass1 - d_structure)))
-
-        plots.plot_structure_sn(sn["Sx"], d_pass1, i_st, sn["j_max"], args.dt,
-                                f"{args.label}_structure_SN_comparison.png")
         print_sn_result(sn)
 
 
