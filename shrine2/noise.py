@@ -9,7 +9,7 @@ from scipy.ndimage import uniform_filter1d
 from .structure import filter_response
 
 
-def noise_variance(x, kc, n_avg=15):
+def noise_variance(x, kc, n_avg=15, verbose=False):
     """sigma_t^2 at every sample of one profile x (Section 3.3.2).
 
     1. Keep only the DCT modes k > k_min, where k_min = max(N/4, 2 k_c), at most 3N/4. These lie
@@ -21,6 +21,7 @@ def noise_variance(x, kc, n_avg=15):
         x: one profile, shape (N,) (in dm_uncertainty, the profile at d_max).
         kc: filter cutoff k_c, which sets k_min.
         n_avg: number of samples in the running mean square.
+        verbose: print k_min and the range of sigma_t^2.
     Returns:
         sigma_t^2 at every sample, shape (N,), in the units of x squared.
     """
@@ -38,7 +39,12 @@ def noise_variance(x, kc, n_avg=15):
     mean_square = uniform_filter1d(noise_only**2, size=n_avg, mode="nearest")
 
     # 3. Correct for the variance removed with the low modes.
-    return mean_square / (1 - k_min / N)
+    sig2 = mean_square / (1 - k_min / N)
+
+    if verbose:
+        print(f"  sigma_t^2 (Sec. 3.3.2): from the DCT modes k > k_min = {k_min} of N = {N}; "
+              f"mean {np.mean(sig2):.4g}, range {sig2.min():.4g} to {sig2.max():.4g}")
+    return sig2
 
 
 def sigma_S(w, sig2):
@@ -54,7 +60,8 @@ def sigma_S(w, sig2):
 
 
 def noise_ratio(sig2, kc, Sp):
-    """Typical length of the filtered noise relative to the structure parameter, sqrt(<||e||^2>) / Sp.
+    """Typical length of the filtered noise relative to the structure parameter,
+    sqrt(<||e||^2>) / Sp.
 
     The expansion behind the uncertainties needs ||e|| << ||a|| (Eq. small); Section 5.2 discusses
     where it holds (the simulations span ~0.3 at S/N 15 to ~0.07 at S/N 200). For noise

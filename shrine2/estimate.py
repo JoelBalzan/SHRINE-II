@@ -11,8 +11,11 @@ from .noise import noise_ratio, noise_variance, sigma_S
 from .structure import coefficients, structure_parameter
 
 
-def dm_uncertainty(I, d, kc, dt_nu, share=None):
+def dm_uncertainty(I, d, kc, dt_nu, share=None, verbose=False):
     """Run Section 3.3 on I(d_j, t).
+
+    The trial DMs are assumed to be uniformly spaced, as every script makes them: the covariance
+    takes the step as d[1] - d[0], and this is not checked.
 
     Args:
         I: I(d_j, t), shape (n_d, N), one row per trial DM.
@@ -21,6 +24,7 @@ def dm_uncertainty(I, d, kc, dt_nu, share=None):
         dt_nu: each channel's dispersion delay per unit DM in samples, shape (n_chan,)
             (profiles.channel_delays divided by dt).
         share: each channel's share of the noise variance, shape (n_chan,); None for equal shares.
+        verbose: print each key result of Section 3.3 as it is found, with its equation.
     Returns:
         dict with
             ok, why: whether the window and fit succeeded, and why not;
@@ -38,13 +42,18 @@ def dm_uncertainty(I, d, kc, dt_nu, share=None):
     # Sp(d_j) at every trial DM (Eq. sp), and d_max, the trial DM with the largest Sp.
     Sp = structure_parameter(I, kc)
     j_max = int(np.argmax(Sp))
+    if verbose:
+        print(f"  Sp(d_j) (Eq. sp): largest at d_max = {d[j_max]:.6g} "
+              f"(trial DM {j_max} of {d.size}), Sp_max = {Sp[j_max]:.4g}")
 
     # sigma_t^2 from the profile at d_max (Sec. 3.3.2).
-    sig2 = noise_variance(I[j_max], kc)
+    sig2 = noise_variance(I[j_max], kc, verbose=verbose)
 
     # w at d_max (Eq. ahat), and sigma_S (Eq. sigS).
     w_max = coefficients(I[j_max], kc)
     sig_S = sigma_S(w_max, sig2)
+    if verbose:
+        print(f"  sigma_S (Eq. sigS) = {sig_S:.4g}, i.e. {sig_S / Sp[j_max]:.3g} of Sp_max")
 
     # The results so far; the fit below adds to them.
     out = dict(
@@ -60,41 +69,78 @@ def dm_uncertainty(I, d, kc, dt_nu, share=None):
         sig2=sig2,
         e_ratio=noise_ratio(sig2, kc, Sp[j_max]),
     )
+    if verbose:
+        print(f"  sqrt(<||e||^2>)/Sp (Eq. small, Sec. 5.2) = {out['e_ratio']:.3g}"
+              "  (first order holds for <~ 0.3)")
 
     # The fit window: the contiguous trial DMs with Sp(d_j) >= Sp_max - sigma_S (Sec. 3.3.3).
     win = fit_window(Sp, sig_S, j_max)
     if win is None:
         out["why"] = "the fit window reaches the end of the DM range: widen the DM range"
+        if verbose:
+            print(f"  no fit: {out['why']}")
         return out
 
     n_win = int(win.sum())
     out["n_win"] = n_win
+    if verbose:
+        print(f"  fit window (Sec. 3.3.3): Sp >= Sp_max - sigma_S = {Sp[j_max] - sig_S:.4g} "
+              f"over {n_win} trial DMs, {d[win][0]:.6g} to {d[win][-1]:.6g}")
     if n_win < 3:
         out["why"] = f"only {n_win} trial DMs in the fit window: use a finer DM step"
+        if verbose:
+            print(f"  no fit: {out['why']}")
         return out
 
     # The parabola about its vertex: d_fit, (c0, c1, c2) and B (Eqs. parab, lsq).
     fit = parabola(d[win], Sp[win])
     if fit is None:
         out["why"] = "the parabola over the fit window has no maximum"
+        if verbose:
+            print(f"  no fit: {out['why']}")
         return out
     d_fit, c, B = fit
+    if verbose:
+        print(f"  parabola about its vertex (Eqs. parab, lsq): d_fit = {d_fit:.6g}, "
+              f"c0 = {c[0]:.4g}, c1 = {c[1]:.2g} (~0 about the vertex), c2 = {c[2]:.4g}")
 
     # w(t; d_j) at every trial DM in the window (Eq. ahat), and V_jl between them (App. 2, Eq. cov).
     step = d[1] - d[0]
     W = coefficients(I[win], kc)
     V = covariance(W, sig2, dt_nu, step, share)
+    if verbose:
+        # How strongly the noise is correlated between trial DMs, which is why V is needed.
+        sd = np.sqrt(np.diag(V))
+        rho_neighbours = np.mean(np.diag(V, 1) / (sd[:-1] * sd[1:]))
+        rho_ends = V[0, -1] / (sd[0] * sd[-1])
+        print(f"  V_jl (App. 2, Eq. cov): {n_win} x {n_win}; correlation {rho_neighbours:.4f} "
+              f"between neighbouring trial DMs, {rho_ends:.3g} between the window's ends")
 
-    # std[c1]^2 = sum_jl B_1j B_1l V_jl (Eq. varc1); a negative value from rounding becomes 0.
+    # std[c1]^2 = sum_jl B_1j B_1l V_jl (Eq. varc1), and the same for c2.
     var_c1 = B[1] @ V @ B[1]
-    sig_c1 = np.sqrt(max(var_c1, 0))
+    var_c2 = B[2] @ V @ B[2]
+
+    # Both must be positive. Otherwise V is not a valid covariance (or the noise is zero), and
+    # sigma_DM would be meaningless.
+    if var_c1 <= 0 or var_c2 <= 0:
+        out["why"] = (f"the propagated variances are not positive (std[c1]^2 = {var_c1:.3g}, "
+                      f"std[c2]^2 = {var_c2:.3g}): sigma_DM cannot be computed")
+        if verbose:
+            print(f"  no fit: {out['why']}")
+        return out
 
     # sigma_DM = std[c1] / |2 c2| (Eq. final).
-    sig_DM = sig_c1 / abs(2 * c[2])
+    sig_DM = np.sqrt(var_c1) / abs(2 * c[2])
 
     # The relative curvature error std[c2] / |c2| (Eq. c2err).
-    var_c2 = B[2] @ V @ B[2]
-    c2_err = np.sqrt(max(var_c2, 0)) / abs(c[2])
+    c2_err = np.sqrt(var_c2) / abs(c[2])
+
+    if verbose:
+        print(f"  std[c1] (Eq. varc1) = {np.sqrt(var_c1):.4g}")
+        print(f"  sigma_DM = std[c1] / |2 c2| (Eq. final) = {sig_DM:.4g} pc cm^-3 "
+              f"({sig_DM / step:.3g} trial-DM steps)")
+        print(f"  std[c2]/|c2| (Eq. c2err) = {c2_err:.3g}"
+              "  (sigma_DM is unreliable as it approaches 1)")
 
     out.update(
         ok=True,

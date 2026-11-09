@@ -40,7 +40,8 @@ def get_args():
     parser.add_argument("-l", "--label", type=str, help="FRB label")
     parser.add_argument("-t", "--dt", type=int, default=1, help="Time resolution of inputs in us.")
     parser.add_argument("-i_st", type=int, help="Index of the structure maximising delta DM")
-    parser.add_argument("-i_sn", type=int, help="Index of the signal to noise ratio maximising delta DM")
+    parser.add_argument("-i_sn", type=int,
+                        help="Index of the signal to noise ratio maximising delta DM")
     parser.add_argument("-d", "--DM_data", type=str, help="Path to the DM data.")
     parser.add_argument("-I", "--I_data", type=str,
                         help="Path to the I data (unused; kept for compatibility with SHRINE).")

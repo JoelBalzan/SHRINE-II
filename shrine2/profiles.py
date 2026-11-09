@@ -25,13 +25,14 @@ K_DM = 2.41e-4
 # Coarse channels formed by SHRINE: 1 MHz each over 336 MHz.
 NCHAN = 336
 
-# CRAFT voltage sample interval, us (336 MHz bandwidth).
-US_PER_SAMPLE = 1 / 336
-
 
 def fine_freqs(f0, bw, n):
     """Frequency of each FFT bin of an n-sample voltage series (SHRINE's get_freqs), from the top
     of the band down.
+
+    Kept exactly as SHRINE, so that the profiles match SHRINE's: bin i is labelled
+    f_max - (i - 1/2) bw/n, half a bin above f_max - i bw/n, where the convention of channel_delays
+    (FFT bin 0 at f_max) puts it. The offset, bw/(2n), is ~5e-5 MHz for a 10-ms crop.
 
     Args:
         f0: centre frequency, MHz.
@@ -51,7 +52,10 @@ def fine_freqs(f0, bw, n):
 def crop(X, Y, I, crop_ms, peak_ms=None):
     """Cut crop_ms milliseconds of voltages centred on the burst (SHRINE's do_crop).
 
-    The burst is at the brightest 1-ms bin of I summed over channels, unless peak_ms is given.
+    The burst is at the brightest 1-ms bin of I summed over all channels, unless peak_ms is given;
+    the crop is centred on the start of that bin. SHRINE left out the last time sample of I here,
+    which, when I holds a whole number of milliseconds, also dropped the last 1-ms bin from the
+    search; all samples are now used.
 
     Args:
         X, Y: complex voltages, shape (n,), one sample per 1/336 us.
@@ -60,18 +64,28 @@ def crop(X, Y, I, crop_ms, peak_ms=None):
         peak_ms: time of the burst in ms (--force_peak), or None to find it from I.
     Returns:
         X, Y cropped (copies).
+    Raises:
+        ValueError if the crop would run off either end of the voltages.
     """
     if peak_ms is None:
-        # Sum over channels and find the brightest 1-ms bin. As SHRINE, the last column of I (the
-        # last time sample, for I of shape (n_chan, n_t)) is left out.
-        I_t = I[:, :-1].sum(axis=0)
+        # Sum over channels and find the brightest 1-ms bin.
+        I_t = I.sum(axis=0)
         peak_ms = int(np.argmax(tscrunch(I_t, 1000)))
 
     # The crop in voltage samples: crop_ms centred on the peak.
     samples_per_ms = 1000 * NCHAN
     mid = peak_ms * samples_per_ms
     half = crop_ms * samples_per_ms // 2
-    return X[mid - half:mid + half].copy(), Y[mid - half:mid + half].copy()
+    first = mid - half
+    last = mid + half
+
+    if first < 0 or last > X.shape[0]:
+        length_ms = X.shape[0] / samples_per_ms
+        raise ValueError(
+            f"a {crop_ms}-ms crop centred on {peak_ms} ms runs off the voltages, which span "
+            f"0 to {length_ms:.3g} ms: give --force_peak or a shorter --crop_dur"
+        )
+    return X[first:last].copy(), Y[first:last].copy()
 
 
 def tscrunch(a, n):

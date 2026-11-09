@@ -98,7 +98,7 @@ def coefficients(I, kc):
     return w_times_Sp / np.expand_dims(Sp, -1)
 
 
-def choose_kc(I, extend=True):
+def choose_kc(I, extend=True, verbose=False):
     """k_c from S23's procedure (Appendix 1), with the paper's extended search unless extend=False.
 
     M(k)    = largest |DCT coefficient k| over the trial DMs                 (Eq. Mk)
@@ -111,16 +111,19 @@ def choose_kc(I, extend=True):
     k_c then moves to the first mode after the last such rise at which Mbar falls back to M_n.
 
     As in SHRINE's dm_processing.get_kc, k_c is a 0-based array index, used as it is in f(k) with
-    k = 1..N.
+    k = 1..N, so it is one mode below the 1-based mode at which Mbar falls to the floor. The k_c
+    values in S23, SHRINE and the paper all follow this convention, so it is kept.
 
     Args:
         I: I(d_j, t), shape (n_d, N), over the trial DMs (the wider the range, the better M(k) is
             sampled).
         extend: True for the paper's extended search (Appendix 1); False for S23's procedure alone.
+        verbose: print the noise floor and where each step puts k_c.
     Returns:
         k_c, an int.
     Raises:
-        RuntimeError if Mbar never falls to the noise floor.
+        RuntimeError if Mbar never falls to the noise floor, or (extended search) never falls back
+        to it after rising above the noise again.
     """
     # M(k): the largest |DCT coefficient| of each mode over the trial DMs (Eq. Mk).
     M = np.max(np.abs(dct(I, norm="ortho", axis=-1)), axis=0)
@@ -142,11 +145,14 @@ def choose_kc(I, extend=True):
             break
     if kc is None:
         raise RuntimeError("could not find k_c: the DCT spectrum never falls to the noise floor")
+    if verbose:
+        print(f"  k_c, S23 (App. 1, Eqs. Mk, runmean): Mbar falls to the noise floor "
+              f"M_n = {Mn:.4g} at k_c = {kc}")
     if not extend:
         return kc
 
     # Extended search: the level M_n + 4 sig_Mbar, with sig_Mbar the spread of Mbar over the upper
-    # half (from six modes above N/2).
+    # half, from six modes above N/2 (as in the paper's code).
     rise_level = Mn + 4 * np.std(Mbar[N // 2 + 6:])
 
     # The last mode between k_c and 2 k_c (and below N/2) at which Mbar is above that level.
@@ -155,11 +161,18 @@ def choose_kc(I, extend=True):
         if Mbar[i] > rise_level:
             last_rise = i
     if last_rise is None:
+        if verbose:
+            print(f"  k_c, extended search (App. 1): Mbar stays below M_n + 4 sig_Mbar = "
+                  f"{rise_level:.4g} between k_c and 2 k_c, so k_c = {kc}")
         return kc
 
     # The spectrum rose above the noise again: k_c moves to the first mode from the last rise on at
-    # which Mbar falls back to the noise floor (N/2 if it never does).
+    # which Mbar falls back to the noise floor.
     for i in range(last_rise, N):
         if Mbar[i] <= Mn:
+            if verbose:
+                print(f"  k_c, extended search (App. 1): Mbar rises above M_n + 4 sig_Mbar = "
+                      f"{rise_level:.4g} again at mode {last_rise}, so k_c moves from {kc} to {i}")
             return i
-    return N // 2
+    raise RuntimeError("could not find k_c: after rising above the noise again at mode "
+                       f"{last_rise}, the DCT spectrum never falls back to the noise floor")

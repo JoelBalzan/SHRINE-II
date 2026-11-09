@@ -38,62 +38,106 @@ def zapped(args):
     Args:
         args: the parsed flags; uses --zap, --zap_edges and -l.
     Returns:
-        sorted array of channel indices (empty if none).
+        zap: sorted array of channel indices (empty if none).
+        warnings: list of str; one warning if the zapped channels were neither given nor recorded.
     """
     if args.zap or args.zap_edges:
-        return zapped_channels(args.zap, args.zap_edges)
+        return zapped_channels(args.zap, args.zap_edges), []
 
     path = Path(f"{args.label}_zap.txt")
     if path.exists():
-        return np.array(path.read_text().split(), dtype=int)
-    return np.array([], dtype=int)
+        return np.array(path.read_text().split(), dtype=int), []
+
+    # No record, as for profiles from SHRINE's own generate_profiles.py, which always leaves out
+    # channel 335.
+    warning = (f"no --zap, --zap_edges or {args.label}_zap.txt: assuming no channels were zapped "
+               "(profiles from SHRINE's own generate_profiles.py need --zap 335)")
+    return np.array([], dtype=int), [warning]
 
 
-def estimate(I, d, args, zap=()):
-    """k_c, then Section 3.3. Returns (result, note on how k_c was chosen, warnings about k_c).
+def choose_kc_from_flags(I, args, verbose=False):
+    """k_c from the flags: -kc if given, otherwise the automatic choice (choose_kc).
 
     Args:
         I: I(d_j, t), shape (n_d, N).
-        d: the trial DMs, shape (n_d,), pc cm^-3.
-        args: the parsed flags; uses -kc, --s23_kc, -f, -b, --nchan and -t.
-        zap: the channels left out of the profiles.
+        args: the parsed flags; uses -kc and --s23_kc.
+        verbose: print how k_c was found.
     Returns:
-        res: the dict returned by estimate.dm_uncertainty.
+        kc: the filter cutoff k_c.
         note: str, how k_c was chosen.
         warnings: list of str, warnings about k_c.
     """
     # The automatic k_c. If it cannot be found, that only matters when no k_c was forced.
     try:
-        kc_auto = choose_kc(I, extend=not args.s23_kc)
+        kc_auto = choose_kc(I, extend=not args.s23_kc, verbose=verbose)
     except RuntimeError:
         if args.force_kc is None:
             raise
         kc_auto = None
 
-    if args.s23_kc:
-        note = "S23's procedure"
-    else:
-        note = "S23's procedure, with the extended search (paper Appendix 1)"
-    kc = kc_auto
+    if args.force_kc is None:
+        if args.s23_kc:
+            note = "S23's procedure"
+        else:
+            note = "S23's procedure, with the extended search (paper Appendix 1)"
+        return kc_auto, note, []
+
+    kc = args.force_kc
+    note = f"forced (-kc); the automatic choice is {kc_auto}"
     warnings = []
+    if verbose:
+        print(f"  k_c forced to {kc} (-kc); the automatic choice is {kc_auto}")
 
-    if args.force_kc is not None:
-        kc = args.force_kc
-        note = f"forced (-kc); the automatic choice is {kc_auto}"
+    # sigma_t^2 uses modes k > k_min = max(N/4, 2 k_c) (Sec. 3.3.2), assumed to lie above the
+    # burst's power. A k_c below the automatic one can put burst power in those modes, inflating
+    # sigma_S and sigma_DM.
+    if kc_auto is not None and kc < kc_auto:
+        warnings.append(f"forced k_c = {kc} is below the automatic {kc_auto}: sigma_t^2 may "
+                        "include burst power, which overestimates sigma_S and sigma_DM")
+    return kc, note, warnings
 
-        # sigma_t^2 uses modes k > k_min = max(N/4, 2 k_c) (Sec. 3.3.2), assumed to lie above the
-        # burst's power. A k_c below the automatic one can put burst power in those modes,
-        # inflating sigma_S and sigma_DM.
-        if kc_auto is not None and kc < kc_auto:
-            warnings.append(f"forced k_c = {kc} is below the automatic {kc_auto}: sigma_t^2 may "
-                            "include burst power, which overestimates sigma_S and sigma_DM")
 
+def estimate(I, d, kc, args, zap=(), verbose=False):
+    """Section 3.3 at k_c, with the channel model given by the flags.
+
+    Args:
+        I: I(d_j, t), shape (n_d, N).
+        d: the trial DMs, shape (n_d,), uniformly spaced, pc cm^-3.
+        kc: the filter cutoff k_c.
+        args: the parsed flags; uses -f, -b, --nchan and -t.
+        zap: the channels left out of the profiles.
+        verbose: print the channel model and each key result of Section 3.3.
+    Returns:
+        the dict returned by estimate.dm_uncertainty.
+    """
     # Each summed channel's delay (us per pc cm^-3) and share of the noise; dt_nu is in samples.
     tau, share = channel_delays(args.f0, args.bw, args.nchan, zap)
     dt_nu = tau / args.dt
+    if verbose:
+        print(f"  channel delays (App. 2, Eq. epchan): {share.sum():.0f} channels summed "
+              f"({len(zap)} zapped), dt_nu from {dt_nu.min():.4g} to {dt_nu.max():.4g} samples "
+              f"per pc cm^-3")
+    return dm_uncertainty(I, d, kc, dt_nu, share, verbose=verbose)
 
-    res = dm_uncertainty(I, d, kc, dt_nu, share)
-    return res, note, warnings
+
+def low_sn_warnings(res):
+    """A pointer to S/N maximisation when the burst looks too faint for structure maximisation.
+
+    The sign is the filtered noise not being small compared with the structure
+    (sqrt(<||e||^2>)/Sp > 0.3, Sec. 5.2), or a poorly determined curvature (std[c2]/|c2| > 0.5).
+
+    Args:
+        res: the dict returned by estimate.dm_uncertainty.
+    Returns:
+        list of str: one warning, or none.
+    """
+    faint = res["e_ratio"] > 0.3
+    if res["ok"] and res["c2_err"] > 0.5:
+        faint = True
+    if not faint:
+        return []
+    return ["structure maximisation may be unreliable for this burst: compare with the "
+            "S/N-maximising DM (maximise_sn.py, or optimise_dm.py --do_sn or --sn_only)"]
 
 
 def save_plots(res, I, args):
@@ -156,11 +200,14 @@ def main():
     args = get_args()
     d = np.load(f"{args.label}_DMs.npy")
     I = np.load(f"{args.label}_I_{args.dt}us.npy")
-    zap = zapped(args)
+    zap, zap_warnings = zapped(args)
 
-    res, kc_note, kc_warnings = estimate(I, d, args, zap)
+    print(f"Structure maximisation (paper Section 3.3): {d.size} trial DMs, {I.shape[1]} samples "
+          f"of {args.dt} us")
+    kc, kc_note, kc_warnings = choose_kc_from_flags(I, args, verbose=True)
+    res = estimate(I, d, kc, args, zap, verbose=True)
     grid_warnings, grid = check_grid(res)
-    warnings = kc_warnings + grid_warnings
+    warnings = zap_warnings + kc_warnings + grid_warnings + low_sn_warnings(res)
 
     write_outputs(res, I, args, kc_note, warnings, grid, zap)
 
@@ -185,7 +232,7 @@ def get_args():
     )
     parser.add_argument("-l", "--label", type=str, help="FRB label")
     parser.add_argument("-t", "--dt", type=int, default=1, help="Time resolution of inputs in us.")
-    parser.add_argument("-d", "--DM", type=float,
+    parser.add_argument("-d", "--DM", type=str,
                         help="Dispersion measure to which the input has been dedispersed in pc/cm3")
     parser.add_argument("-s", "--save_all", action="store_true", default=False,
                         help="Save all plots.")
@@ -205,7 +252,8 @@ def get_args():
                              "--zap 0 100-110 335 (default: those in {label}_zap.txt from "
                              "generate_profiles.py)")
     parser.add_argument("--zap_edges", type=int, default=0,
-                        help="Leave out the first and last N channel indices (1 = channels 0 and 335)")
+                        help="Leave out the first and last N channel indices "
+                             "(1 = channels 0 and 335)")
     return parser.parse_args()
 
 

@@ -128,8 +128,10 @@ def get_args():
                         help="Set the delta DM step to the one-sample DM step for -t, -f and -b "
                              "(ignores --dDM and --cDM)")
     parser.add_argument("-t", "--dt", type=int, default=1, help="Time resolution to return in us")
-    parser.add_argument("-f", "--f0", type=float, help="Central frequency of observation in MHz")
-    parser.add_argument("-b", "--bw", type=int, default=336, help="Bandwidth of observation in MHz")
+    parser.add_argument("-f", "--f0", type=float, required=True,
+                        help="Central frequency of observation in MHz")
+    parser.add_argument("-b", "--bw", type=float, default=336,
+                        help="Bandwidth of observation in MHz")
     parser.add_argument("--crop_dur", type=int, default=10, help="Duration of the crop in ms")
     parser.add_argument("-I", type=str, help="I profile filename (for doing the crop)")
     parser.add_argument("--force_peak", type=int, default=None,
@@ -138,7 +140,8 @@ def get_args():
                         help="Coarse channels to leave out: indices and inclusive ranges, e.g. "
                              "--zap 0 100-110 335 (SHRINE always left out 335)")
     parser.add_argument("--zap_edges", type=int, default=0,
-                        help="Leave out the first and last N channel indices (1 = channels 0 and 335)")
+                        help="Leave out the first and last N channel indices "
+                             "(1 = channels 0 and 335)")
     return parser.parse_args()
 
 

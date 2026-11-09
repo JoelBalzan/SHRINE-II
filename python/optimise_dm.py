@@ -12,6 +12,9 @@ the final I(DM, t) as generate_profiles.py would, and each earlier pass's I(DM, 
 _pass<n> suffix. With --do_sn, also finds the S/N-maximising DM (maximise_sn.py) on the pass-1
 trial DMs, which are the widest, and plots the smoothed profiles at both DMs
 ({label}_structure_SN_comparison.png).
+
+With --sn_only, finds only the S/N-maximising DM, on the trial DMs given (no structure
+maximisation and no refinement): the standalone S/N mode, for very low S/N bursts.
 """
 import sys
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
@@ -23,12 +26,36 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from generate_profiles import trial_dms, write_zap_file
+from maximise_sn import kc_for_sn
+from maximise_sn import print_result as print_sn_result
 from maximise_sn import write_outputs as write_sn_outputs
-from maximise_structure import estimate
+from maximise_structure import choose_kc_from_flags, estimate, low_sn_warnings
 from maximise_structure import write_outputs as write_structure_outputs
 from shrine2 import check_grid, plots
 from shrine2.profiles import crop, make_profiles, zapped_channels
 from shrine2.snr import maximise_sn
+
+
+def sn_only(X, Y, d, zap, args):
+    """--sn_only: the profiles on the trial DMs given, then S/N maximisation alone.
+
+    Writes the outputs of generate_profiles.py (except its summary file) and of maximise_sn.py.
+
+    Args:
+        X, Y: cropped complex voltages, shape (n,).
+        d: the trial DMs, shape (n_d,), pc cm^-3.
+        zap: the channels left out of the profiles.
+        args: the parsed flags.
+    """
+    I = make_profiles(X, Y, d, args.f0, args.bw, args.dt, zap)
+    np.save(f"{args.label}_DMs.npy", d)
+    np.save(f"{args.label}_I_{args.dt}us.npy", I)
+    write_zap_file(args.label, zap)
+
+    kc = kc_for_sn(I, args)
+    sn = maximise_sn(I, d, kc, args.dt)
+    write_sn_outputs(sn, I, args.label, args.dt, args.save_all)
+    print_sn_result(sn)
 
 
 def main():
@@ -44,20 +71,26 @@ def main():
     zap = zapped_channels(args.zap, args.zap_edges)
     d = trial_dms(args, zap)
 
+    if args.sn_only:
+        sn_only(X, Y, d, zap, args)
+        return
+
     for n in range(1, args.max_passes + 1):
         I = make_profiles(X, Y, d, args.f0, args.bw, args.dt, zap)
+        print(f"pass {n}: {d.size} trial DMs, step {d[1] - d[0]:.3g}, {I.shape[1]} samples of "
+              f"{args.dt} us")
 
+        # k_c is chosen once, from pass 1, whose trial DMs are the widest, and kept in later passes.
         if n == 1:
-            res, kc_note, kc_warnings = estimate(I, d, args, zap)
-
-            # Keep k_c from pass 1, whose trial DMs are the widest, in the later passes.
-            args.force_kc = res["kc"]
+            kc, kc_note, kc_warnings = choose_kc_from_flags(I, args, verbose=True)
 
             # Pass 1's profiles, for the S/N maximisation (--do_sn).
             I_pass1 = I
             d_pass1 = d
         else:
-            res, _, _ = estimate(I, d, args, zap)
+            print(f"  k_c = {kc} (from pass 1)")
+
+        res = estimate(I, d, kc, args, zap, verbose=True)
 
         # A finer grid of trial DMs, or None if these are fine enough.
         _, grid = check_grid(res)
@@ -66,7 +99,7 @@ def main():
             result_text = f"{res['d_fit']:.6g} +/- {res['sig_DM']:.3g}"
         else:
             result_text = res["why"]
-        print(f"pass {n}: {d.size} trial DMs, step {d[1] - d[0]:.3g}: {result_text}")
+        print(f"pass {n} result: {result_text}")
 
         if grid is None or n == args.max_passes:
             break
@@ -84,7 +117,7 @@ def main():
 
     # The last pass's result, as maximise_structure.py writes it (with pass 1's note on k_c).
     grid_warnings, grid = check_grid(res)
-    warnings = kc_warnings + grid_warnings
+    warnings = kc_warnings + grid_warnings + low_sn_warnings(res)
     write_structure_outputs(res, I, args, kc_note, warnings, grid, zap)
     for message in warnings:
         print("Warning:", message)
@@ -102,7 +135,7 @@ def main():
 
         plots.plot_structure_sn(sn["Sx"], d_pass1, i_st, sn["j_max"], args.dt,
                                 f"{args.label}_structure_SN_comparison.png")
-        print(f"S/N-maximising delta DM = {sn['d_sn']:.6g} (S/N {sn['SN_max']:.1f})")
+        print_sn_result(sn)
 
 
 def get_args():
@@ -112,7 +145,8 @@ def get_args():
         the parsed flags (argparse.Namespace).
     """
     parser = ArgumentParser(
-        description="Structure-maximising delta DM and its 1-sigma uncertainty from CRAFT voltages.",
+        description="Structure-maximising delta DM and its 1-sigma uncertainty from CRAFT "
+                    "voltages.",
         formatter_class=ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("-l", "--label", type=str, help="FRB label")
@@ -132,7 +166,8 @@ def get_args():
     parser.add_argument("-t", "--dt", type=int, default=1, help="Time resolution in us")
     parser.add_argument("-f", "--f0", type=float, required=True,
                         help="Central frequency of observation in MHz")
-    parser.add_argument("-b", "--bw", type=int, default=336, help="Bandwidth of observation in MHz")
+    parser.add_argument("-b", "--bw", type=float, default=336,
+                        help="Bandwidth of observation in MHz")
     parser.add_argument("--nchan", type=int, default=336,
                         help="Number of coarse channels formed from the voltages")
     parser.add_argument("--crop_dur", type=int, default=10, help="Duration of the crop in ms")
@@ -143,7 +178,8 @@ def get_args():
                         help="Coarse channels to leave out: indices and inclusive ranges, e.g. "
                              "--zap 0 100-110 335 (SHRINE always left out 335)")
     parser.add_argument("--zap_edges", type=int, default=0,
-                        help="Leave out the first and last N channel indices (1 = channels 0 and 335)")
+                        help="Leave out the first and last N channel indices "
+                             "(1 = channels 0 and 335)")
     parser.add_argument("-s", "--save_all", action="store_true", default=False,
                         help="Save all plots.")
     parser.add_argument("-kc", "--force_kc", type=int, default=None, help="Value of kc to use.")
@@ -153,8 +189,16 @@ def get_args():
     parser.add_argument("--max_passes", type=int, default=3,
                         help="Largest number of passes over the trial DMs")
     parser.add_argument("--do_sn", action="store_true", default=False,
-                        help="Also find the S/N-maximising delta DM (as SHRINE's maximise_sn.py)")
-    return parser.parse_args()
+                        help="Also find the S/N-maximising delta DM (as SHRINE's maximise_sn.py), "
+                             "on the pass-1 trial DMs")
+    parser.add_argument("--sn_only", action="store_true", default=False,
+                        help="Find only the S/N-maximising delta DM, on the trial DMs given (no "
+                             "structure maximisation or refinement); for very low S/N bursts")
+    args = parser.parse_args()
+
+    if args.max_passes < 1:
+        parser.error("--max_passes must be at least 1")
+    return args
 
 
 if __name__ == "__main__":

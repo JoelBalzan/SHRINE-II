@@ -2,8 +2,10 @@
 """The S/N-maximising delta DM of an FRB, from I(DM, t). Same flags, inputs and outputs as SHRINE's
 maximise_sn.py.
 
-Not part of the paper's method; kept for comparison (see shrine2/snr.py for the method and what
-was fixed).
+A standalone alternative to maximise_structure.py, and the one to use for very low S/N bursts,
+where structure maximisation does not work well (see shrine2/snr.py for the method and what was
+fixed relative to SHRINE). Run it on the output of generate_profiles.py, or run
+optimise_dm.py --sn_only to go straight from the voltages.
 
 Inputs  (from generate_profiles.py, in the working directory)
     {label}_DMs.npy, {label}_I_{dt}us.npy
@@ -25,6 +27,20 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from shrine2 import choose_kc, plots
 from shrine2.snr import maximise_sn
 from shrine2.summary import write_sn_summary
+
+
+def kc_for_sn(I, args):
+    """k_c for the smoothing before the boxcar search: -kc if given, otherwise choose_kc.
+
+    Args:
+        I: I(d_j, t), shape (n_d, N).
+        args: the parsed flags; uses -kc and --s23_kc.
+    Returns:
+        the filter cutoff k_c.
+    """
+    if args.force_kc is not None:
+        return args.force_kc
+    return choose_kc(I, extend=not args.s23_kc)
 
 
 def write_outputs(sn, I, label, dt, save_all):
@@ -52,20 +68,32 @@ def write_outputs(sn, I, label, dt, save_all):
             out.write(f"{j}")
 
 
+def print_result(sn):
+    """Print the S/N-maximising delta DM, its range and the k_c used.
+
+    Args:
+        sn: the dict returned by snr.maximise_sn.
+    """
+    d = sn["d"]
+    j = sn["j_max"]
+    print(f"S/N-maximising delta DM = {sn['d_sn']:.6g} "
+          f"(+{d[sn['hi']] - d[j]:.3g} -{d[j] - d[sn['lo']]:.3g}, S/N {sn['SN_max']:.1f}), "
+          f"k_c = {sn['kc']}")
+    if not (sn["lo_found"] and sn["hi_found"]):
+        print("Warning: the S/N does not fall by 1 within the trial DMs on one side: "
+              "widen -L/-H for that bound")
+
+
 def main():
     """Read I(DM, t), find the S/N-maximising DM and write SHRINE's maximise_sn outputs."""
     args = get_args()
     d = np.load(f"{args.label}_DMs.npy")
     I = np.load(f"{args.label}_I_{args.dt}us.npy")
 
-    if args.force_kc is not None:
-        kc = args.force_kc
-    else:
-        kc = choose_kc(I, extend=not args.s23_kc)
-
+    kc = kc_for_sn(I, args)
     sn = maximise_sn(I, d, kc, args.dt)
     write_outputs(sn, I, args.label, args.dt, args.save_all)
-    print(f"S/N-maximising delta DM = {sn['d_sn']:.6g} (S/N {sn['SN_max']:.1f}), k_c = {kc}")
+    print_result(sn)
 
 
 def get_args():
@@ -75,7 +103,8 @@ def get_args():
         the parsed flags (argparse.Namespace).
     """
     parser = ArgumentParser(
-        description="Calculates signal to noise ratio maximising delta DM for pre-dedispersed data.",
+        description="Calculates signal to noise ratio maximising delta DM for pre-dedispersed "
+                    "data.",
         formatter_class=ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("-l", "--label", type=str, help="FRB label")

@@ -104,14 +104,23 @@ def plot_I_DM_t(I, d, dt, path):
 
     Args:
         I: I(d_j, t), shape (n_d, N).
-        d: the trial DMs, shape (n_d,), pc cm^-3.
+        d: the trial DMs, shape (n_d,), uniformly spaced, pc cm^-3.
         dt: time resolution, us.
         path: output file name.
     """
     duration_ms = I.shape[1] * dt / 1000
 
+    # Each row is centred on its trial DM, so the image extends half a step beyond the first and
+    # last trial DMs.
+    if d.size > 1:
+        half_step = (d[1] - d[0]) / 2
+    else:
+        half_step = 0.5
+    d_bottom = d[0] - half_step
+    d_top = d[-1] + half_step
+
     fig, ax = plt.subplots(figsize=(6, 4))
-    ax.imshow(I, aspect="auto", origin="lower", extent=(0, duration_ms, d[0], d[-1]))
+    ax.imshow(I, aspect="auto", origin="lower", extent=(0, duration_ms, d_bottom, d_top))
     ax.set_xlabel("Time (ms)")
     ax.set_ylabel(DM_LABEL)
     fig.tight_layout()

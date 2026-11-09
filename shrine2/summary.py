@@ -42,7 +42,8 @@ def write_summary(path, res, label, dt, DM, kc_note, warnings, grid, saving=Fals
                       "\t//1 sigma\n")
             out.write(f"\tVertex of a parabola fitted over delta DM {res['d_lo']} to {res['d_hi']} "
                       f"({res['n_win']} trial DMs).\n")
-            out.write(f"\tDelta DM of the largest structure parameter on the grid: {res['d_max']}\n")
+            out.write("\tDelta DM of the largest structure parameter on the grid: "
+                      f"{res['d_max']}\n")
             out.write(f"\tRelative curvature error std[c2]/|c2|: {res['c2_err']:.3f}"
                       "\t//sigma_DM is unreliable as it approaches 1\n")
         else:
@@ -51,9 +52,10 @@ def write_summary(path, res, label, dt, DM, kc_note, warnings, grid, saving=Fals
             out.write("Uncertainty in Structure Maximising Delta DM: unknown\n")
 
         # The structure parameter and the validity check of the first-order expansion.
-        out.write(f"Structure Parameter at Maximum: {res['Sp_max']} +/- {res['sig_S']}\t//1 sigma\n")
-        out.write(f"\tFiltered noise / structure parameter: sqrt(<||e||^2>)/S = {res['e_ratio']:.3f}"
-                  "\t//first order holds for <~ 0.3\n")
+        out.write(f"Structure Parameter at Maximum: {res['Sp_max']} +/- {res['sig_S']}"
+                  "\t//1 sigma\n")
+        out.write("\tFiltered noise / structure parameter: sqrt(<||e||^2>)/S = "
+                  f"{res['e_ratio']:.3f}\t//first order holds for <~ 0.3\n")
 
         for message in warnings:
             out.write(f"\tWarning: {message}.\n")
@@ -67,7 +69,8 @@ def write_summary(path, res, label, dt, DM, kc_note, warnings, grid, saving=Fals
 
 
 def write_sn_summary(path, sn, dt):
-    """Write {label}_SN_summaryfile.txt for a result of snr.maximise_sn (SHRINE's maximise_sn layout).
+    """Write {label}_SN_summaryfile.txt for a result of snr.maximise_sn, in SHRINE's maximise_sn
+    layout.
 
     Args:
         path: output file name.

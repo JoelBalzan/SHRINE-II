@@ -1,5 +1,5 @@
-"""SHRINE-II: the structure-maximising DM of S23 (Sutinjo et al. 2023) with the 1-sigma uncertainties
-of Balzan et al. (in prep.).
+"""SHRINE-II: the structure-maximising DM of S23 (Sutinjo et al. 2023) with the 1-sigma
+uncertainties of Balzan et al. (in prep.), and SHRINE's S/N-maximising DM.
 
 Modules, in the order the paper uses them:
     structure   Sp = ||D1 S x||, the coefficients w, k_c          (Sections 2.2, 3.1, 3.3.1; App. 1)
@@ -9,7 +9,8 @@ Modules, in the order the paper uses them:
     estimate    all of Section 3.3 in one call: dm_uncertainty()
     profiles    I(d_j, t) from CRAFT voltages, as SHRINE's generate_profiles.py, and the channel
                 delays
-    snr         S/N maximisation, as SHRINE's maximise_sn.py (not part of the paper's method)
+    snr         S/N maximisation, as SHRINE's maximise_sn.py: the standalone alternative for very
+                low S/N bursts
     summary     the summary files written by the scripts
     plots       the diagnostic plots
 """

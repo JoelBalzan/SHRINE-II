@@ -2,13 +2,16 @@
 
 Structure maximisation of High-time Resolution Intensity profiles with No-nonsense Errors, revisited.
 
-SHRINE ([Sutinjo et al. 2023](https://ui.adsabs.harvard.edu/abs/2023ApJ...954...37S/abstract), "S23") finds the DM that
-maximises the structure of an FRB's profile. SHRINE-II takes the same inputs and flags, and replaces S23's uncertainties
-with the 1-sigma uncertainties of Balzan et al. (in prep.), "the paper" below:
+SHRINE ([Sutinjo et al. 2023](https://ui.adsabs.harvard.edu/abs/2023ApJ...954...37S/abstract), "S23") finds the DM of an
+FRB from its CRAFT voltages. SHRINE-II takes the same inputs and flags, and has SHRINE's two modes:
 
-- sigma_S, the uncertainty of the structure parameter (paper Section 3.1);
-- sigma_DM, the uncertainty of the structure-maximising DM, from one parabola fit with the noise propagated through it
-  (paper Section 3.3).
+- **Structure maximisation**: the DM that maximises the structure of the profile, with S23's uncertainties replaced by
+  the 1-sigma uncertainties of Balzan et al. (in prep.), "the paper" below:
+  - sigma_S, the uncertainty of the structure parameter (paper Section 3.1);
+  - sigma_DM, the uncertainty of the structure-maximising DM, from one parabola fit with the noise propagated through
+    it (paper Section 3.3).
+- **S/N maximisation**: the DM that maximises the boxcar S/N, as SHRINE's `maximise_sn.py` (with its bugs fixed). It
+  runs on its own, and is the mode to use for very low S/N bursts, where structure maximisation does not work well.
 
 The code is written to be read next to the paper: names follow the paper's symbols, and comments give the equation
 or section each line evaluates.
@@ -27,18 +30,30 @@ Needs numpy, scipy and matplotlib.
 The scripts in `python/` take SHRINE's flags and file names, so they slot into SHRINE's pipeline.
 
 ```bash
-# 1. I(DM, t) from CRAFT X/Y voltages (as SHRINE's generate_profiles.py)
+# I(DM, t) from CRAFT X/Y voltages, for either mode (as SHRINE's generate_profiles.py)
 python python/generate_profiles.py -l <label> -d <DM> -L -1 -H 1 --dDM 0.01 -t 25 -f <f0 MHz> -I <I file>
 
-# 2. Structure-maximising delta DM and its 1-sigma uncertainty (as SHRINE's maximise_structure.py)
+# Structure maximisation: the delta DM and its 1-sigma uncertainty (as SHRINE's maximise_structure.py)
 python python/maximise_structure.py -l <label> -t 25 -d <DM> -f <f0 MHz> -s
 
-# or both in one go, refining the trial DMs until they are fine enough, with the S/N-maximising DM too
+# S/N maximisation, on its own (as SHRINE's maximise_sn.py)
+python python/maximise_sn.py -l <label> -t 25 -s
+
+# Both, and the comparison plot (as SHRINE's structure_SN_comparison.py)
+python python/structure_SN_comparison.py -l <label> -t 25 -i_st <row> -i_sn <row> -d <label>_DMs.npy -s <label>_I_smooth_25us.npy
+```
+
+Or in one go from the voltages with `optimise_dm.py`:
+
+```bash
+# Structure maximisation, refining the trial DMs until they are fine enough
+python python/optimise_dm.py -l <label> -d <DM> -L -1 -H 1 --dDM_auto -t 25 -f <f0 MHz> -I <I file> -s
+
+# ... with the S/N-maximising DM and the comparison plot too (as SHRINE's --do_sn)
 python python/optimise_dm.py -l <label> -d <DM> -L -1 -H 1 --dDM_auto -t 25 -f <f0 MHz> -I <I file> --do_sn -s
 
-# S/N-maximising delta DM and the comparison plot (as SHRINE's maximise_sn.py and structure_SN_comparison.py)
-python python/maximise_sn.py -l <label> -t 25 -s
-python python/structure_SN_comparison.py -l <label> -t 25 -i_st <row> -i_sn <row> -d <label>_DMs.npy -s <label>_I_smooth_25us.npy
+# S/N maximisation only, on the trial DMs given (for very low S/N bursts)
+python python/optimise_dm.py -l <label> -d <DM> -L -1 -H 1 --dDM 0.01 -t 25 -f <f0 MHz> -I <I file> --sn_only -s
 ```
 
 | Script | Reads | Writes |
@@ -47,7 +62,7 @@ python python/structure_SN_comparison.py -l <label> -t 25 -i_st <row> -i_sn <row
 | `maximise_structure.py` | `{label}_DMs.npy`, `{label}_I_{dt}us.npy` | `{label}_structure_summaryfile.txt`, `{label}_SPs.dat`, `{label}_I_smooth_{dt}us.npy`; with `-s`, `DM.txt` and plots |
 | `maximise_sn.py` | `{label}_DMs.npy`, `{label}_I_{dt}us.npy` | `{label}_SN_summaryfile.txt`, `{label}_SN_DMs.dat`, `{label}_SN.png`, `{label}_Max_SN_window.png`, `{label}_{dt}us_I_SN_max.png`; with `-s`, `{label}_I_smooth.npy` and `DM.txt` |
 | `structure_SN_comparison.py` | the trial DMs and smoothed profiles given | `{label}_structure_SN_comparison.png` |
-| `optimise_dm.py` | as `generate_profiles.py` | as `generate_profiles.py` and `maximise_structure.py`, for the last pass; earlier passes' profiles with `_pass<n>`; with `--do_sn`, as `maximise_sn.py` (on pass 1) and the comparison plot |
+| `optimise_dm.py` | as `generate_profiles.py` | as `generate_profiles.py` and `maximise_structure.py`, for the last pass; earlier passes' profiles with `_pass<n>`; with `--do_sn`, as `maximise_sn.py` (on pass 1) and the comparison plot; with `--sn_only`, as `generate_profiles.py` and `maximise_sn.py` only |
 
 Flags are SHRINE's, with these additions and changes:
 
@@ -68,7 +83,14 @@ Flags are SHRINE's, with these additions and changes:
   Finer steps still change the profile, by fractions of a sample, and when sigma_DM is smaller than this step,
   `optimise_dm.py` refines below it.
 - `--do_sn`, in `optimise_dm.py`: also find the S/N-maximising DM, as SHRINE's `--do_sn`.
-- `-f/--f0` is required in `maximise_structure.py`: sigma_DM needs each channel's dispersion delay (with `-b/--bw` and `--nchan`).
+- `--sn_only`, in `optimise_dm.py`: find only the S/N-maximising DM, on the trial DMs given, with no structure
+  maximisation and no refinement (the standalone S/N mode).
+- `-f/--f0` is required in `generate_profiles.py`, `maximise_structure.py` and `optimise_dm.py`: the profiles need it,
+  and sigma_DM needs each channel's dispersion delay (with `-b/--bw` and `--nchan`).
+- `-d/--DM` is read as text and `-b/--bw` as a number in every script, so the summary's `Initial DM:` is exactly what
+  was given.
+- `maximise_structure.py` warns if it has neither `--zap`/`--zap_edges` nor `{label}_zap.txt`. Profiles made by SHRINE's
+  own `generate_profiles.py` have no zap file and always leave out channel 335, so give them `--zap 335`.
 - `--s23_kc`, in `maximise_structure.py`, `maximise_sn.py` and `optimise_dm.py`: choose k_c with S23's procedure alone,
   without the paper's extended search (Appendix 1).
 
@@ -81,12 +103,21 @@ window, the relative curvature error, sqrt(<||e||^2>)/S and any warnings. If the
 
 ### S/N maximisation
 
-`shrine2/snr.py` ports SHRINE's `maximise_sn.py`. It is not part of the paper's method and is kept for comparison.
+`shrine2/snr.py` ports SHRINE's `maximise_sn.py`, and `python/maximise_sn.py` runs it on its own, on the output of
+`generate_profiles.py` (or `optimise_dm.py --sn_only` from the voltages). It needs no structure-maximisation output.
 
+- **When to use it.** For very low S/N bursts, where structure maximisation does not work well: the fit window or the
+  parabola fails, or the summary's sqrt(<||e||^2>)/S is above ~0.3, so the expansion behind sigma_DM breaks down
+  (paper Section 5.2). `maximise_structure.py` and `optimise_dm.py` then warn and point here.
 - **Search.** For each trial DM, the smoothed profile S x, less a common baseline, is searched for the boxcar with the
   largest S/N = sum / (sigma sqrt(length)). Boxcars can start anywhere and run from 1 sample to 10 ms.
 - **Result and range.** The S/N-maximising DM is the trial DM with the largest boxcar S/N. Its range is the trial DMs
-  where the S/N stays within 1 of that maximum.
+  where the S/N stays within 1 of that maximum (SHRINE's criterion). The summary gives it as `+... -...`, and says if
+  the S/N does not fall by 1 before the end of the trial DMs on a side (then that bound is a lower limit: widen
+  `-L`/`-H`). Unlike sigma_DM, this range has not been calibrated against simulations. The step of the trial DMs
+  should be well below the range.
+- **k_c.** k_c for S x is chosen as for structure maximisation: `-kc`, or the automatic choice, with or without
+  `--s23_kc`.
 - **Kept from SHRINE.** sigma is the standard deviation of the residual I − S I over all trial DMs and samples, and the
   baseline is the smallest value of S I. With those choices it reproduces SHRINE's S/N exactly once the bugs below are
   put back in.
@@ -101,6 +132,12 @@ window, the relative curvature error, sqrt(<||e||^2>)/S and any warnings. If the
 
 `shrine2.estimate.dm_uncertainty` runs the paper's Section 3.3 in order. Equation numbers are those of the draft of
 2026-11-09; the LaTeX labels are given too, since the numbers will move.
+
+`maximise_structure.py` and `optimise_dm.py` print each key result as it is found, labelled with its equation or
+section: k_c (both steps of Appendix 1), the channel delays, Sp_max and d_max, sigma_t^2, sigma_S,
+sqrt(<||e||^2>)/S, the fit window, the parabola, the correlation of the noise between trial DMs in V, std[c1],
+sigma_DM and std[c2]/|c2|. In Python, pass `verbose=True` to `dm_uncertainty` and `choose_kc` for the same lines;
+they are off by default so that Monte Carlo loops stay quiet.
 
 | Step | Code | Paper |
 |---|---|---|
@@ -124,7 +161,7 @@ Names used throughout:
 |---|---|---|
 | `I` | x(d_j) | profiles, one row per trial DM |
 | `d` | d_j | trial (delta-)DMs, uniformly spaced |
-| `kc`, `f`, `lam` | k_c, f(k), λ_k | filter cutoff and response, eigenvalues of D1^T D1 |
+| `kc`, `f`, `lam` | k_c, f(k), λ_k | filter cutoff and response, eigenvalues of D1^T D1 (k_c is a 0-based index used as the mode number in f(k), as in S23, SHRINE and the paper) |
 | `Sp`, `Sp_max` | 𝒮(d_j), 𝒮_max | structure parameter |
 | `w`, `W` | w, w(t; d_j) | coefficients at one trial DM, at every trial DM in the window |
 | `sig2` | σ_t² | profile-noise variance at each sample |
@@ -158,14 +195,18 @@ out the zapped ones.
   (14 significant figures).
 - The scripts for these are in `checks/`.
 - `tests/`: Sp and w against the explicit matrices (w is the gradient of Sp), V against its definition and a
-  Monte Carlo, the parabola fit, the k_c search, a toy-burst calibration, the boxcar search against brute force, and
-  the one-sample DM step.
+  Monte Carlo, the parabola fit, the k_c search, a toy-burst calibration, the boxcar search against brute force,
+  the one-sample DM step and the crop.
 
 ## Using it on real data
 
 - **Trial-DM step.** The paper's simulations use a step of sigma_DM/6, with trial DMs out to ~15 sigma_DM. You don't
   know sigma_DM before the first run, so either rerun `generate_profiles.py` with the suggested grid or use
   `optimise_dm.py`. It warns if the step is coarser than sigma_DM/3.
+- **Uniform trial DMs.** The trial DMs are assumed to be uniformly spaced, as every script makes them: the covariance V
+  takes the step as d[1] − d[0], and this is not checked. If you make I(DM, t) yourself, keep the step constant.
+- **The crop.** The burst is found as the brightest 1-ms bin of the `-I` file (assumed to be at 1 µs), summed over all
+  channels, unless `--force_peak` is given. A crop that would run off either end of the voltages stops with an error.
 - **Forcing k_c.** sigma_t^2 uses the DCT modes above k_min = max(N/4, 2 k_c), assumed to hold no burst power. A forced
   k_c well below the automatic one can break that and overestimate sigma_S and sigma_DM; a warning is written if the
   forced k_c is below the automatic one.
@@ -175,6 +216,8 @@ out the zapped ones.
 - **Self-noise.** sigma_t^2 is a local average from one profile, so with strong self-noise it varies from one trial DM
   to the next, and sigma_DM for a given burst can change by tens of per cent when the trial DMs change. In the voltage
   check above it was still unbiased on average.
+- **Low S/N.** For very faint bursts use S/N maximisation (see above); the structure-maximisation scripts warn when
+  sqrt(<||e||^2>)/S > 0.3 or std[c2]/|c2| > 0.5.
 - **Validity.** sigma_DM is a first-order result. The summary reports sqrt(<||e||^2>)/S (paper Section 5.2; the
   simulations span ~0.07-0.3) and std[c2]/|c2| (unreliable as it approaches 1; Section 3.3.4). sigma_DM is the
   statistical uncertainty about the structure-maximising DM, which can differ from the dispersive DM when the burst

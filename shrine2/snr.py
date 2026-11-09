@@ -1,10 +1,15 @@
-"""S/N maximisation, as SHRINE's maximise_sn.py. Not part of the paper's method; kept for comparison.
+"""S/N maximisation, as SHRINE's maximise_sn.py: a standalone alternative to structure maximisation.
+
+Use it for very low S/N bursts, where structure maximisation does not work well: there the fit
+window or the parabola can fail, and the expansion behind sigma_DM breaks down (the summary's
+sqrt(<||e||^2>)/S well above 0.3). The S/N needs only the burst's total fluence in a boxcar, not its
+fine structure.
 
 For each trial DM, the smoothed profile S x (Eq. smooth) less a common baseline is searched for the
 boxcar, of any start and of length 1 sample to 10 ms, with the largest
 S/N = (sum over the boxcar) / (sigma sqrt(length)). The S/N-maximising DM is the trial DM with the
 largest boxcar S/N, and its range is where the S/N stays within 1 of that maximum (SHRINE's
-criterion).
+criterion; unlike sigma_DM, it has not been calibrated against simulations).
 
 SHRINE's choices are kept:
     sigma    = standard deviation of the residual I - S I over all trial DMs and samples;
