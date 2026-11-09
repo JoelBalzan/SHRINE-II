@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+*.npy
+*.dat
+*.png
+*_summaryfile.txt
+DM.txt
+.venv/
+checks/
+tests/
+*_zap.txt
