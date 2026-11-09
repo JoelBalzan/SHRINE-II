@@ -1,6 +1,9 @@
-"""Diagnostic plots (written by maximise_structure.py with -s/--save_all)."""
+"""Diagnostic plots (written by maximise_structure.py with -s/--save_all, and by maximise_sn.py)."""
 import matplotlib
+
+# A non-interactive backend: the plots are only written to files.
 matplotlib.use("Agg")
+
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.fft import dct
@@ -11,25 +14,39 @@ DM_LABEL = r"$\Delta$DM (pc cm$^{-3}$)"
 
 
 def plot_structure(res, path):
-    """Sp(d) with +-sigma_S, the fit window, the parabola and d_fit +- sigma_DM (as Figure 6 of the paper).
+    """Sp(d) with +-sigma_S, the fit window, the parabola and d_fit +- sigma_DM (as Figure 6 of the
+    paper).
 
     Args:
         res: the dict returned by estimate.dm_uncertainty.
         path: output file name.
     """
-    d, Sp = res["d"], res["Sp"]
+    d = res["d"]
+    Sp = res["Sp"]
+
     fig, ax = plt.subplots(figsize=(6, 4))
+
+    # Sp(d) with a band of +-sigma_S.
     ax.fill_between(d, Sp - res["sig_S"], Sp + res["sig_S"], color="C1", alpha=0.2, lw=0)
     ax.plot(d, Sp, color="C1", label=r"$\mathcal{S}\pm\sigma_\mathcal{S}$")
+
     if res["ok"]:
+        # The fit window.
         ax.axvspan(res["d_lo"], res["d_hi"], color="C4", alpha=0.1, label="Fit window")
+
+        # The fitted parabola over the window, about its vertex d_fit.
         x = np.linspace(res["d_lo"], res["d_hi"], 200) - res["d_fit"]
         c0, c1, c2 = res["c"]
         ax.plot(x + res["d_fit"], c0 + c1 * x + c2 * x**2, "k--", label="Parabola fit")
+
+        # d_fit +- sigma_DM at the parabola's peak.
         ax.errorbar(res["d_fit"], c0, xerr=res["sig_DM"], fmt="o", color="C4", capsize=3,
                     label=r"$d_{\rm fit}\pm\sigma_{\rm DM}$")
+
+        # Show three window widths about d_fit.
         span = 3 * (res["d_hi"] - res["d_lo"])
         ax.set_xlim(res["d_fit"] - span / 2, res["d_fit"] + span / 2)
+
     ax.set_xlabel(DM_LABEL)
     ax.set_ylabel(r"Structure parameter $\mathcal{S}$")
     ax.legend()
@@ -46,8 +63,11 @@ def plot_dct(I, kc, path):
         kc: filter cutoff k_c.
         path: output file name.
     """
+    modes = np.arange(1, I.shape[1] + 1)
+    abs_coefficients = np.abs(dct(I, norm="ortho", axis=-1))
+
     fig, ax = plt.subplots(figsize=(6, 4))
-    ax.loglog(np.arange(1, I.shape[1] + 1), np.abs(dct(I, norm="ortho", axis=-1)).T, ".", ms=1, color="0.5")
+    ax.loglog(modes, abs_coefficients.T, ".", ms=1, color="0.5")
     ax.axvline(kc, color="C0", label=f"$k_c$ = {kc}")
     ax.set_xlabel("Mode $k$")
     ax.set_ylabel("|DCT coefficient|")
@@ -66,10 +86,11 @@ def plot_profile(x, kc, dt, path):
         dt: time resolution, us.
         path: output file name.
     """
-    t = np.arange(x.size) * dt / 1000
+    t_ms = np.arange(x.size) * dt / 1000
+
     fig, ax = plt.subplots(figsize=(6, 3.5))
-    ax.plot(t, x, color="0.6", lw=0.6, label=r"$\mathbf{x}$")
-    ax.plot(t, smooth(x, kc), color="C1", label=r"$\mathbf{Sx}$")
+    ax.plot(t_ms, x, color="0.6", lw=0.6, label=r"$\mathbf{x}$")
+    ax.plot(t_ms, smooth(x, kc), color="C1", label=r"$\mathbf{Sx}$")
     ax.set_xlabel("Time (ms)")
     ax.set_ylabel("I")
     ax.legend()
@@ -87,8 +108,10 @@ def plot_I_DM_t(I, d, dt, path):
         dt: time resolution, us.
         path: output file name.
     """
+    duration_ms = I.shape[1] * dt / 1000
+
     fig, ax = plt.subplots(figsize=(6, 4))
-    ax.imshow(I, aspect="auto", origin="lower", extent=(0, I.shape[1] * dt / 1000, d[0], d[-1]))
+    ax.imshow(I, aspect="auto", origin="lower", extent=(0, duration_ms, d[0], d[-1]))
     ax.set_xlabel("Time (ms)")
     ax.set_ylabel(DM_LABEL)
     fig.tight_layout()
@@ -115,7 +138,8 @@ def plot_sn(d, SN, path):
 
 
 def plot_sn_window(Sx, start, length, dt, path):
-    """The smoothed profile at the S/N-maximising DM with its boxcar (SHRINE's {label}_Max_SN_window.png).
+    """The smoothed profile at the S/N-maximising DM with its boxcar (SHRINE's
+    {label}_Max_SN_window.png).
 
     Args:
         Sx: the smoothed profile at the S/N-maximising DM, shape (N,).
@@ -123,10 +147,13 @@ def plot_sn_window(Sx, start, length, dt, path):
         dt: time resolution, us.
         path: output file name.
     """
-    t = np.arange(Sx.size) * dt / 1000
+    t_ms = np.arange(Sx.size) * dt / 1000
+    boxcar_start_ms = start * dt / 1000
+    boxcar_end_ms = (start + length) * dt / 1000
+
     fig, ax = plt.subplots(figsize=(6, 3.5))
-    ax.plot(t, Sx)
-    ax.axvspan(start * dt / 1000, (start + length) * dt / 1000, color="red", alpha=0.3)
+    ax.plot(t_ms, Sx)
+    ax.axvspan(boxcar_start_ms, boxcar_end_ms, color="red", alpha=0.3)
     ax.set_xlabel("Time (ms)")
     ax.set_ylabel("I")
     fig.tight_layout()
@@ -135,7 +162,8 @@ def plot_sn_window(Sx, start, length, dt, path):
 
 
 def plot_structure_sn(Sx, d, i_st, i_sn, dt, path):
-    """Smoothed profiles at the structure- and S/N-maximising DMs (SHRINE's {label}_structure_SN_comparison.png).
+    """Smoothed profiles at the structure- and S/N-maximising DMs (SHRINE's
+    {label}_structure_SN_comparison.png).
 
     Args:
         Sx: smoothed profiles S x, shape (n_d, N).
@@ -144,10 +172,13 @@ def plot_structure_sn(Sx, d, i_st, i_sn, dt, path):
         dt: time resolution, us.
         path: output file name.
     """
-    t = np.arange(Sx.shape[1]) * dt / 1000
+    t_ms = np.arange(Sx.shape[1]) * dt / 1000
+    label_st = f"Structure Maximised\n($\\Delta$DM = {d[i_st]:.5g})"
+    label_sn = f"S/N Maximised\n($\\Delta$DM = {d[i_sn]:.5g})"
+
     fig, ax = plt.subplots(figsize=(6, 3.5))
-    ax.plot(t, Sx[i_st], color="blue", label=f"Structure Maximised\n($\\Delta$DM = {d[i_st]:.5g})")
-    ax.plot(t, Sx[i_sn], "--", color="red", label=f"S/N Maximised\n($\\Delta$DM = {d[i_sn]:.5g})")
+    ax.plot(t_ms, Sx[i_st], color="blue", label=label_st)
+    ax.plot(t_ms, Sx[i_sn], "--", color="red", label=label_sn)
     ax.set_xlabel("Time (ms)")
     ax.set_ylabel("I")
     ax.legend()

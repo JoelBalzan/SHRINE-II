@@ -154,7 +154,8 @@ out the zapped ones.
   channels in the channel model instead would raise sigma_DM by about 28%. The channel delays were checked against
   the shift that the dedispersion actually applies to each channel.
 - **S/N maximisation.** On profiles from the synthetic voltages, `maximise_sn` picks the same trial DM and range as
-  SHRINE's `maximise_sn.py`, and with SHRINE's boxcar off-by-one put back it gives the same maximum S/N to all digits.
+  SHRINE's `maximise_sn.py`, and with SHRINE's boxcar off-by-one put back it gives the same maximum S/N to rounding
+  (14 significant figures).
 - The scripts for these are in `checks/`.
 - `tests/`: Sp and w against the explicit matrices (w is the gradient of Sp), V against its definition and a
   Monte Carlo, the parabola fit, the k_c search, a toy-burst calibration, the boxcar search against brute force, and
