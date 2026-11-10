@@ -253,6 +253,11 @@ def channel_delays(f0, bw=336.0, nchan=NCHAN, zap=()):
     with the sign convention I(t; d) = sum_nu I_nu(t + d tau_nu) (App. 2, Eq. epchan): a positive
     trial DM moves low frequencies earlier and high frequencies later.
 
+    The entries are in loop order (the two halves of channel 0 first, then the other channels kept,
+    in index order), not sorted by frequency. The order does not matter: tau and share are built
+    together, so entry i of each describes the same piece of the band, and everything that uses
+    them (noise_covariance, one_sample_dm_step) only sums or compares over all the entries.
+
     Args:
         f0: centre frequency, MHz (the delays are relative to it).
         bw: bandwidth, MHz.
@@ -273,8 +278,11 @@ def channel_delays(f0, bw=336.0, nchan=NCHAN, zap=()):
     share = []
     for c in np.setdiff1d(np.arange(nchan), zap):
         if c == 0:
-            f.append(f_max - chan_width / 4)             # top half-channel
-            f.append(f_min + chan_width / 4)             # bottom half-channel
+            # Channel 0 as two pieces, each half a channel wide: f_max - w/2 .. f_max at the top
+            # and f_min .. f_min + w/2 at the bottom. Each is placed at its centre, w/4 in from the
+            # band edge, and has half the channel's noise.
+            f.append(f_max - chan_width / 4)             # centre of the top half-channel
+            f.append(f_min + chan_width / 4)             # centre of the bottom half-channel
             share.append(0.5)
             share.append(0.5)
         else:
