@@ -6,10 +6,11 @@ import numpy as np
 
 
 def fit_window(Sp, sig_S, j_max):
-    """The fit window (Section 3.3.3): S23's interval (Eq. s23int) with sigma_S in place of theirs.
+    """The trial DMs used in the parabola fit: the contiguous trial DMs about the peak with
+    Sp(d_j) >= Sp_max - sigma_S (Section 3.3.3).
 
-    That is the contiguous trial DMs about the peak with Sp(d_j) >= Sp_max - sigma_S, found by
-    stepping out from the peak one trial DM at a time on each side.
+    This is S23's interval (Eq. s23int) with sigma_S in place of theirs. It is found by stepping out
+    from the peak one trial DM at a time on each side.
 
     Args:
         Sp: Sp(d_j) at every trial DM, shape (n_d,).
@@ -39,8 +40,9 @@ def fit_window(Sp, sig_S, j_max):
     return win
 
 
-def least_squares(x, y):
-    """B = (A^T A)^-1 A^T and c = B y for a parabola in x (Eq. lsq).
+def parabola_least_squares(x, y):
+    """The least-squares fit of a parabola y ~ c0 + c1 x + c2 x^2: the matrix B = (A^T A)^-1 A^T
+    and the parameters c = B y (Eq. lsq).
 
     Row j of A holds the numbers that multiply c0, c1, c2 at x_j: (1, x_j, x_j^2).
     pinv(A) equals (A^T A)^-1 A^T here (A has full column rank) and is numerically stabler.
@@ -58,8 +60,9 @@ def least_squares(x, y):
     return B, c
 
 
-def parabola(d, Sp):
-    """Least-squares parabola Sp(d) ~ c0 + c1 (d - d_fit) + c2 (d - d_fit)^2 (Eq. parab).
+def fit_parabola(d, Sp):
+    """Fit a parabola to Sp over the fit window and return its vertex d_fit, its parameters about
+    the vertex, Sp(d) ~ c0 + c1 (d - d_fit) + c2 (d - d_fit)^2, and B (Eqs. parab, lsq).
 
     Two passes:
       1. fit about the centre of the window (for numerical conditioning only) to locate the
@@ -77,7 +80,7 @@ def parabola(d, Sp):
     """
     # Pass 1: about the centre of the window. A parabola that opens upwards has no maximum.
     d_mid = d.mean()
-    _, c_mid = least_squares(d - d_mid, Sp)
+    _, c_mid = parabola_least_squares(d - d_mid, Sp)
     if c_mid[2] >= 0:
         return None
 
@@ -85,5 +88,5 @@ def parabola(d, Sp):
     d_fit = d_mid - c_mid[1] / (2 * c_mid[2])
 
     # Pass 2: the same parabola about the vertex (c[1] ~ 0).
-    B, c = least_squares(d - d_fit, Sp)
+    B, c = parabola_least_squares(d - d_fit, Sp)
     return d_fit, c, B

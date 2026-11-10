@@ -26,9 +26,9 @@ K_DM = 2.41e-4
 NCHAN = 336
 
 
-def fine_freqs(f0, bw, n):
-    """Frequency of each FFT bin of an n-sample voltage series (SHRINE's get_freqs), from the top
-    of the band down.
+def fft_bin_frequencies(f0, bw, n):
+    """The sky frequency of each FFT bin of an n-sample voltage series, from the top of the band
+    down (SHRINE's get_freqs).
 
     Kept exactly as SHRINE, so that the profiles match SHRINE's: bin i is labelled
     f_max - (i - 1/2) bw/n, half a bin above f_max - i bw/n, where the convention of channel_delays
@@ -49,8 +49,8 @@ def fine_freqs(f0, bw, n):
     return np.linspace(f_max, f_min, n, endpoint=False) + bin_width / 2
 
 
-def crop(X, Y, I, crop_ms, peak_ms=None):
-    """Cut crop_ms milliseconds of voltages centred on the burst (SHRINE's do_crop).
+def crop_voltages(X, Y, I, crop_ms, peak_ms=None):
+    """Cut crop_ms milliseconds of the X and Y voltages, centred on the burst (SHRINE's do_crop).
 
     The burst is at the brightest 1-ms bin of I summed over all channels, unless peak_ms is given;
     the crop is centred on the start of that bin. SHRINE left out the last time sample of I here,
@@ -113,7 +113,7 @@ def dedispersion_phase(dm, freqs):
 
     Args:
         dm: DM to remove, pc cm^-3, relative to the DM the voltages were already dedispersed to.
-        freqs: frequency of each FFT bin, MHz (fine_freqs).
+        freqs: frequency of each FFT bin, MHz (fft_bin_frequencies).
     Returns:
         complex phase for each bin, shape (n,).
     """
@@ -124,8 +124,9 @@ def dedispersion_phase(dm, freqs):
     return np.exp(i_phase)
 
 
-def dynamic_spectrum(v):
-    """Coarse channels of a voltage series (SHRINE's generate_dynspec): one FFT per NCHAN samples.
+def channelise(v):
+    """Split a voltage series into NCHAN coarse channels, with one FFT per block of NCHAN samples
+    (SHRINE's generate_dynspec).
 
     Args:
         v: complex voltages, shape (n,).
@@ -138,15 +139,17 @@ def dynamic_spectrum(v):
     return np.fft.fft(blocks, axis=1).astype(np.complex64)
 
 
-def profile(FX, FY, dm, freqs, dt, zap=()):
-    """The frequency-summed profile at one trial DM (SHRINE's do_DM), from the voltage spectra.
+def profile_at_dm(FX, FY, dm, freqs, dt, zap=()):
+    """The frequency-summed intensity profile at one trial DM, from the voltage spectra: dedisperse,
+    form the coarse channels, leave out the zapped ones, normalise and sum the rest, and average
+    down to dt (SHRINE's do_DM).
 
     Args:
         FX, FY: FFTs of the cropped X and Y voltages, shape (n,).
         dm: trial delta-DM, pc cm^-3.
-        freqs: frequency of each FFT bin, MHz (fine_freqs).
+        freqs: frequency of each FFT bin, MHz (fft_bin_frequencies).
         dt: output time resolution, us.
-        zap: indices of the coarse channels to leave out (zapped_channels).
+        zap: indices of the coarse channels to leave out (parse_zapped_channels).
     Returns:
         the profile x at this trial DM, shape (n // NCHAN // dt,).
     """
@@ -154,8 +157,8 @@ def profile(FX, FY, dm, freqs, dt, zap=()):
 
     # Steps 1-3: dedisperse each polarisation, form its coarse channels and add the powers,
     # I(t, channel) = |X|^2 + |Y|^2.
-    X_power = np.abs(dynamic_spectrum(np.fft.ifft(FX * phase)))**2
-    Y_power = np.abs(dynamic_spectrum(np.fft.ifft(FY * phase)))**2
+    X_power = np.abs(channelise(np.fft.ifft(FX * phase)))**2
+    Y_power = np.abs(channelise(np.fft.ifft(FY * phase)))**2
     I_tc = X_power + Y_power
 
     # Step 4: leave out the zapped channels.
@@ -171,29 +174,33 @@ def profile(FX, FY, dm, freqs, dt, zap=()):
 
 
 def make_profiles(X, Y, dms, f0, bw, dt, zap=()):
-    """I(d_j, t) for the trial DMs dms (one row per trial DM).
+    """The frequency-summed profiles I(d_j, t) at every trial DM in dms, one row per trial DM
+    (profile_at_dm at each).
 
     Args:
         X, Y: cropped complex voltages, shape (n,).
         dms: trial delta-DMs, shape (n_d,), pc cm^-3.
         f0, bw: centre frequency and bandwidth, MHz.
         dt: output time resolution, us.
-        zap: indices of the coarse channels to leave out (zapped_channels).
+        zap: indices of the coarse channels to leave out (parse_zapped_channels).
     Returns:
         I(d_j, t), shape (n_d, N).
     """
-    freqs = fine_freqs(f0, bw, X.shape[0])
+    freqs = fft_bin_frequencies(f0, bw, X.shape[0])
 
     # The voltage spectra are computed once and reused at every trial DM.
     FX = np.fft.fft(X)
     FY = np.fft.fft(Y)
 
-    rows = [profile(FX, FY, dm, freqs, dt, zap) for dm in dms]
+    # One row per trial DM.
+    rows = []
+    for dm in dms:
+        rows.append(profile_at_dm(FX, FY, dm, freqs, dt, zap))
     return np.array(rows)
 
 
-def zapped_channels(zap=(), zap_edges=0, nchan=NCHAN):
-    """The coarse channels to leave out, from --zap and --zap_edges.
+def parse_zapped_channels(zap=(), zap_edges=0, nchan=NCHAN):
+    """The coarse channel indices to leave out, parsed from the --zap and --zap_edges flags.
 
     Channel c is centred on f_max - c bw/nchan (see channel_delays), so channels 1, 2, ... run down
     from the top of the band and nchan-1, nchan-2, ... up from the bottom; channel 0 straddles both
@@ -234,7 +241,8 @@ def zapped_channels(zap=(), zap_edges=0, nchan=NCHAN):
 
 
 def channel_delays(f0, bw=336.0, nchan=NCHAN, zap=()):
-    """Dispersion delay per unit DM of each channel summed by profile(), and its share of the noise.
+    """The dispersion delay per unit DM of each channel summed into the profiles, and its share of
+    the noise: the channel model that the noise covariance needs (Appendix 2).
 
     Coarse channel c is FFT bin c of a block of nchan voltage samples; SHRINE's FFT bins run down
     from the top of the band, so channel c is centred on f_max - c bw/nchan. Channel 0 is centred
@@ -287,7 +295,7 @@ def one_sample_dm_step(f0, bw, dt, nchan=NCHAN, zap=()):
     This is the DM resolution set by the time and frequency coverage: dt / (tau_bottom - tau_top),
     with tau the dispersion delay per unit DM of the channels summed (channel_delays). Finer steps
     still change the profile, by fractions of a sample, and the fit may need them when sigma_DM is
-    smaller than this (optimise_dm.py refines the trial DMs to sigma_DM/6 when it is).
+    smaller than this (check_trial_dms then suggests a finer step).
 
     Args:
         f0, bw: centre frequency and bandwidth, MHz.

@@ -20,11 +20,13 @@ import numpy as np
 
 # Run from a checkout without installing.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from shrine2.profiles import crop, make_profiles, one_sample_dm_step, zapped_channels
+from shrine2.profiles import (crop_voltages, make_profiles, one_sample_dm_step,
+                              parse_zapped_channels)
 
 
 def trial_dms(args, zap=()):
-    """The trial delta-DMs from the flags.
+    """The trial delta-DMs at which to make the profiles, from -L, -H and one of --dDM, --cDM or
+    --dDM_auto.
 
     As SHRINE: --cDM evenly spaced values if --cDM > 0, otherwise -L, -L + --dDM, ... < -H.
     With --dDM_auto, the step is instead the one-sample DM step (profiles.one_sample_dm_step): the
@@ -60,22 +62,28 @@ def write_zap_file(label, zap):
         label: FRB label (-l).
         zap: the zapped channel indices.
     """
+    # The channel indices as text, separated by spaces.
+    zap_words = []
+    for c in zap:
+        zap_words.append(str(c))
+
     with open(f"{label}_zap.txt", "w") as out:
-        out.write(" ".join(str(c) for c in zap) + "\n")
+        out.write(" ".join(zap_words) + "\n")
 
 
 def main():
-    """Read the voltages, crop them, and write I(DM, t) for the trial DMs."""
+    """Read the voltages, crop them about the burst, and write the profiles I(DM, t) at every trial
+    DM, with the trial DMs, the zapped channels and a summary file."""
     args = get_args()
 
     # The voltages, cropped about the burst.
     X = np.load(f"{args.label}_X_t_{args.DM}.npy", mmap_mode="r")
     Y = np.load(f"{args.label}_Y_t_{args.DM}.npy", mmap_mode="r")
     I_for_crop = np.load(args.I, mmap_mode="r")
-    X, Y = crop(X, Y, I_for_crop, args.crop_dur, args.force_peak)
+    X, Y = crop_voltages(X, Y, I_for_crop, args.crop_dur, args.force_peak)
 
     # The profiles at every trial DM, from the channels that are not zapped.
-    zap = zapped_channels(args.zap, args.zap_edges)
+    zap = parse_zapped_channels(args.zap, args.zap_edges)
     d = trial_dms(args, zap)
     I = make_profiles(X, Y, d, args.f0, args.bw, args.dt, zap)
 
@@ -85,7 +93,11 @@ def main():
     np.savetxt(f"{args.label}_I_{args.dt}us.dat", I)
     write_zap_file(args.label, zap)
 
-    zap_text = " ".join(str(c) for c in zap)
+    # The zapped channel indices as text, separated by spaces ("none" if there are none).
+    zap_words = []
+    for c in zap:
+        zap_words.append(str(c))
+    zap_text = " ".join(zap_words)
     if not zap_text:
         zap_text = "none"
 
@@ -103,7 +115,7 @@ def main():
 
 
 def get_args():
-    """The command-line flags.
+    """Parse the command-line flags.
 
     Returns:
         the parsed flags (argparse.Namespace).

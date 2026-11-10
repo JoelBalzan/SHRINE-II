@@ -22,15 +22,16 @@ import numpy as np
 
 # Run from a checkout without installing.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from shrine2 import check_grid, choose_kc, dm_uncertainty
-from shrine2.profiles import channel_delays, zapped_channels
+from shrine2 import check_trial_dms, choose_kc, dm_uncertainty
+from shrine2.noise import high_mode_noise
+from shrine2.profiles import channel_delays, parse_zapped_channels
 from shrine2.structure import smooth
-from shrine2.summary import write_summary
+from shrine2.summary import write_structure_summary
 
 
-def zapped(args):
-    """The zapped channels: from --zap/--zap_edges if given, otherwise from {label}_zap.txt if it
-    exists.
+def read_zapped_channels(args):
+    """The channels left out of the profiles: from --zap/--zap_edges if given, otherwise from
+    {label}_zap.txt (written by generate_profiles.py) if it exists.
 
     The channel delays must describe the channels generate_profiles.py actually summed, which it
     records in {label}_zap.txt.
@@ -42,7 +43,7 @@ def zapped(args):
         warnings: list of str; one warning if the zapped channels were neither given nor recorded.
     """
     if args.zap or args.zap_edges:
-        return zapped_channels(args.zap, args.zap_edges), []
+        return parse_zapped_channels(args.zap, args.zap_edges), []
 
     path = Path(f"{args.label}_zap.txt")
     if path.exists():
@@ -56,7 +57,8 @@ def zapped(args):
 
 
 def choose_kc_from_flags(I, args, verbose=False):
-    """k_c from the flags: -kc if given, otherwise the automatic choice (choose_kc).
+    """The filter cutoff k_c: -kc if given, otherwise the automatic choice (choose_kc), with a note
+    on how it was chosen and a warning if a forced k_c is below the automatic one.
 
     Args:
         I: I(d_j, t), shape (n_d, N).
@@ -97,8 +99,10 @@ def choose_kc_from_flags(I, args, verbose=False):
     return kc, note, warnings
 
 
-def estimate(I, d, kc, args, zap=(), verbose=False):
-    """Section 3.3 at k_c, with the channel model given by the flags.
+def dm_uncertainty_from_flags(I, d, kc, args, zap=(), verbose=False):
+    """The structure-maximising DM and sigma_DM (dm_uncertainty), with each channel's dispersion
+    delay and noise share, which sigma_DM needs, worked out from the flags (-f, -b, --nchan, -t)
+    and the zapped channels.
 
     Args:
         I: I(d_j, t), shape (n_d, N).
@@ -121,7 +125,8 @@ def estimate(I, d, kc, args, zap=(), verbose=False):
 
 
 def low_sn_warnings(res):
-    """A pointer to S/N maximisation when the burst looks too faint for structure maximisation.
+    """A warning pointing to S/N maximisation when the burst looks too faint for structure
+    maximisation.
 
     The sign is the filtered noise not being small compared with the structure
     (sqrt(<||e||^2>)/Sp > 0.3, Sec. 5.2), or a poorly determined curvature (std[c2]/|c2| > 0.5).
@@ -140,12 +145,13 @@ def low_sn_warnings(res):
             "S/N-maximising DM (maximise_sn.py, or optimise_dm.py --do_sn or --sn_only)"]
 
 
-def save_plots(res, I, args):
-    """DM.txt and the diagnostic plots ({label}_{dt}us_*.png), as SHRINE with -s.
+def save_plots(res, I, Sx, args):
+    """Write DM.txt and the diagnostic plots ({label}_{dt}us_*.png), as SHRINE does with -s.
 
     Args:
         res: the dict returned by estimate.dm_uncertainty.
         I: I(d_j, t), shape (n_d, N).
+        Sx: the smoothed profiles S x, shape (n_d, N).
         args: the parsed flags; uses -l and -t.
     """
     # Imported here so that matplotlib is only loaded when plots are wanted.
@@ -163,14 +169,21 @@ def save_plots(res, I, args):
     with open("DM.txt", "w") as out:
         out.write(f"{res['j_max']}")
 
-    plots.plot_structure(res, f"{tag}_structure_parameter.png")
-    plots.plot_dct(I, res["kc"], f"{tag}_DCT_v_k_index.png")
-    plots.plot_profile(I[j], res["kc"], args.dt, f"{tag}_I_max.png")
+    plots.plot_structure_parameter(res, f"{tag}_structure_parameter.png")
+    plots.plot_dct_spectrum(I, res["kc"], f"{tag}_DCT_v_k_index.png")
+    plots.plot_profile_and_smoothed(I[j], res["kc"], args.dt, f"{tag}_I_max.png")
     plots.plot_I_DM_t(I, res["d"], args.dt, f"{tag}_I_DM_t.png")
+    plots.plot_I_DM_t(Sx, res["d"], args.dt, f"{tag}_I_DM_t_smoothed.png")
+    plots.plot_I_DM_t(I - Sx, res["d"], args.dt, f"{tag}_detrended_noise.png")
+
+    # The noise that sigma_t^2 is taken from: the profile at d_max, from its high DCT modes.
+    noise_only, k_min = high_mode_noise(I[res["j_max"]], res["kc"])
+    plots.plot_noise_at_d_max(noise_only, res["sig2"], k_min, res["d_max"], args.dt,
+                              f"{tag}_noise_max.png")
 
 
-def write_outputs(res, I, args, kc_note, warnings, grid, zap):
-    """Everything maximise_structure.py writes for a result of estimate.dm_uncertainty.
+def write_structure_outputs(res, I, args, kc_note, warnings, grid, zap):
+    """Write every output file of maximise_structure.py for a result of estimate.dm_uncertainty.
 
     {label}_SPs.dat, {label}_I_smooth_{dt}us.npy, {label}_structure_summaryfile.txt and, with -s,
     DM.txt and the plots.
@@ -181,35 +194,42 @@ def write_outputs(res, I, args, kc_note, warnings, grid, zap):
         args: the parsed flags; uses -l, -t, -d and -s.
         kc_note: how k_c was chosen.
         warnings: list of str, for the summary file.
-        grid: (d_low, d_high, step) from check_grid, or None.
+        grid: (d_low, d_high, step) from check_trial_dms, or None.
         zap: the channels left out of the profiles.
     """
     np.savetxt(f"{args.label}_SPs.dat", res["Sp"])
 
     # The smoothed profiles, as SHRINE writes them.
-    np.save(f"{args.label}_I_smooth_{args.dt}us.npy", smooth(I, res["kc"]))
+    Sx = smooth(I, res["kc"])
+    np.save(f"{args.label}_I_smooth_{args.dt}us.npy", Sx)
 
-    write_summary(f"{args.label}_structure_summaryfile.txt", res, args.label, args.dt, args.DM,
-                  kc_note, warnings, grid, args.save_all, zap)
+    write_structure_summary(f"{args.label}_structure_summaryfile.txt", res, args.label, args.dt,
+                            args.DM, kc_note, warnings, grid, args.save_all, zap)
     if args.save_all:
-        save_plots(res, I, args)
+        save_plots(res, I, Sx, args)
 
 
-def main():
-    """Read I(DM, t), run Section 3.3 and write the summary, SPs.dat and (with -s) plots."""
-    args = get_args()
-    d = np.load(f"{args.label}_DMs.npy")
-    I = np.load(f"{args.label}_I_{args.dt}us.npy")
-    zap, zap_warnings = zapped(args)
+def run_structure_maximisation(I, d, args, zap, extra_warnings=()):
+    """Run structure maximisation on I(d_j, t) from start to finish: choose k_c, find the DM and
+    sigma_DM, check the trial DMs, write the outputs and print the key results.
 
-    print(f"Structure maximisation (paper Section 3.3): {d.size} trial DMs, {I.shape[1]} samples "
-          f"of {args.dt} us")
+    Args:
+        I: I(d_j, t), shape (n_d, N).
+        d: the trial DMs, shape (n_d,), uniformly spaced, pc cm^-3.
+        args: the parsed flags.
+        zap: the channels left out of the profiles.
+        extra_warnings: warnings to put first in the summary file (e.g. about the zapped channels).
+    Returns:
+        the dict returned by estimate.dm_uncertainty.
+    """
+    print(f"Structure maximisation (paper Section 3.3): {d.size} trial DMs, "
+          f"step {d[1] - d[0]:.3g}, {I.shape[1]} samples of {args.dt} us")
     kc, kc_note, kc_warnings = choose_kc_from_flags(I, args, verbose=True)
-    res = estimate(I, d, kc, args, zap, verbose=True)
-    grid_warnings, grid = check_grid(res)
-    warnings = zap_warnings + kc_warnings + grid_warnings + low_sn_warnings(res)
+    res = dm_uncertainty_from_flags(I, d, kc, args, zap, verbose=True)
+    grid_warnings, grid = check_trial_dms(res)
+    warnings = list(extra_warnings) + kc_warnings + grid_warnings + low_sn_warnings(res)
 
-    write_outputs(res, I, args, kc_note, warnings, grid, zap)
+    write_structure_outputs(res, I, args, kc_note, warnings, grid, zap)
 
     if res["ok"]:
         print(f"delta DM = {res['d_fit']:.6g} +/- {res['sig_DM']:.3g} (1 sigma), k_c = {res['kc']}")
@@ -217,11 +237,21 @@ def main():
         print("Warning:", message)
     if grid is not None:
         d_low, d_high, step = grid
-        print(f"Rerun generate_profiles.py with -L {d_low:.6g} -H {d_high:.6g} --dDM {step:.3g}")
+        print(f"Rerun with -L {d_low:.6g} -H {d_high:.6g} --dDM {step:.3g}")
+    return res
+
+
+def main():
+    """Read the profiles written by generate_profiles.py and run structure maximisation on them."""
+    args = get_args()
+    d = np.load(f"{args.label}_DMs.npy")
+    I = np.load(f"{args.label}_I_{args.dt}us.npy")
+    zap, zap_warnings = read_zapped_channels(args)
+    run_structure_maximisation(I, d, args, zap, zap_warnings)
 
 
 def get_args():
-    """The command-line flags.
+    """Parse the command-line flags.
 
     Returns:
         the parsed flags (argparse.Namespace).

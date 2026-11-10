@@ -5,14 +5,19 @@ equation or section it evaluates.
 """
 import numpy as np
 
-from .covariance import covariance
-from .fit import fit_window, parabola
-from .noise import noise_ratio, noise_variance, sigma_S
-from .structure import coefficients, structure_parameter
+from .covariance import noise_covariance
+from .fit import fit_parabola, fit_window
+from .noise import filtered_noise_ratio, noise_variance, sigma_S
+from .structure import sp_gradient, structure_parameter
 
 
 def dm_uncertainty(I, d, kc, dt_nu, share=None, verbose=False):
-    """Run Section 3.3 on I(d_j, t).
+    """The structure-maximising DM and its 1-sigma uncertainty, sigma_DM, from the profiles
+    I(d_j, t): the whole of the paper's Section 3.3.
+
+    In order: Sp at every trial DM; sigma_t^2 and sigma_S at the peak; the fit window; the
+    parabola and its vertex, d_fit; the noise covariance V between the trial DMs in the window;
+    and from these, sigma_DM.
 
     The trial DMs are assumed to be uniformly spaced, as every script makes them: the covariance
     takes the step as d[1] - d[0], and this is not checked.
@@ -50,7 +55,7 @@ def dm_uncertainty(I, d, kc, dt_nu, share=None, verbose=False):
     sig2 = noise_variance(I[j_max], kc, verbose=verbose)
 
     # w at d_max (Eq. ahat), and sigma_S (Eq. sigS).
-    w_max = coefficients(I[j_max], kc)
+    w_max = sp_gradient(I[j_max], kc)
     sig_S = sigma_S(w_max, sig2)
     if verbose:
         print(f"  sigma_S (Eq. sigS) = {sig_S:.4g}, i.e. {sig_S / Sp[j_max]:.3g} of Sp_max")
@@ -67,7 +72,7 @@ def dm_uncertainty(I, d, kc, dt_nu, share=None, verbose=False):
         Sp_max=Sp[j_max],
         sig_S=sig_S,
         sig2=sig2,
-        e_ratio=noise_ratio(sig2, kc, Sp[j_max]),
+        e_ratio=filtered_noise_ratio(sig2, kc, Sp[j_max]),
     )
     if verbose:
         print(f"  sqrt(<||e||^2>)/Sp (Eq. small, Sec. 5.2) = {out['e_ratio']:.3g}"
@@ -93,7 +98,7 @@ def dm_uncertainty(I, d, kc, dt_nu, share=None, verbose=False):
         return out
 
     # The parabola about its vertex: d_fit, (c0, c1, c2) and B (Eqs. parab, lsq).
-    fit = parabola(d[win], Sp[win])
+    fit = fit_parabola(d[win], Sp[win])
     if fit is None:
         out["why"] = "the parabola over the fit window has no maximum"
         if verbose:
@@ -106,8 +111,8 @@ def dm_uncertainty(I, d, kc, dt_nu, share=None, verbose=False):
 
     # w(t; d_j) at every trial DM in the window (Eq. ahat), and V_jl between them (App. 2, Eq. cov).
     step = d[1] - d[0]
-    W = coefficients(I[win], kc)
-    V = covariance(W, sig2, dt_nu, step, share)
+    W = sp_gradient(I[win], kc)
+    V = noise_covariance(W, sig2, dt_nu, step, share)
     if verbose:
         # How strongly the noise is correlated between trial DMs, which is why V is needed.
         sd = np.sqrt(np.diag(V))
@@ -158,8 +163,9 @@ def dm_uncertainty(I, d, kc, dt_nu, share=None, verbose=False):
     return out
 
 
-def check_grid(res):
-    """Warnings about the trial DMs for a result of dm_uncertainty, and a suggested finer grid.
+def check_trial_dms(res):
+    """Check whether the trial DMs of a result of dm_uncertainty were fine and wide enough, and
+    suggest a better grid if not.
 
     The paper's simulations use a step of sigma_DM/6 (35-163 trial DMs in the fit window) and trial
     DMs out to about 15 sigma_DM either side. If the fit window holds fewer than three trial DMs,

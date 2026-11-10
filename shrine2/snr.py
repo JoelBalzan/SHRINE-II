@@ -27,7 +27,8 @@ MAX_WINDOW_MS = 10
 
 
 def best_boxcars(X, sigma, n_max):
-    """For each row of X, the boxcar with the largest S/N over all starts and lengths 1..n_max.
+    """Find, for each profile (row of X), the boxcar with the largest S/N over all starts and
+    lengths 1..n_max.
 
     Args:
         X: baseline-subtracted smoothed profiles, shape (n_d, N).
@@ -63,7 +64,8 @@ def best_boxcars(X, sigma, n_max):
 
 
 def maximise_sn(I, d, kc, dt):
-    """The S/N-maximising trial DM of I(d_j, t) and the trial DMs within 1 of its S/N.
+    """The S/N-maximising trial DM of I(d_j, t), from a boxcar search of the smoothed profiles, and
+    the range of trial DMs whose S/N is within 1 of the maximum.
 
     Args:
         I: I(d_j, t), shape (n_d, N).

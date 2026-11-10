@@ -30,7 +30,8 @@ from shrine2.summary import write_sn_summary
 
 
 def kc_for_sn(I, args):
-    """k_c for the smoothing before the boxcar search: -kc if given, otherwise choose_kc.
+    """The filter cutoff k_c for smoothing the profiles before the boxcar search: -kc if given,
+    otherwise the automatic choice (choose_kc).
 
     Args:
         I: I(d_j, t), shape (n_d, N).
@@ -43,8 +44,8 @@ def kc_for_sn(I, args):
     return choose_kc(I, extend=not args.s23_kc)
 
 
-def write_outputs(sn, I, label, dt, save_all):
-    """Everything SHRINE's maximise_sn.py writes, for a result of snr.maximise_sn.
+def write_sn_outputs(sn, I, label, dt, save_all):
+    """Write every output file of SHRINE's maximise_sn.py for a result of snr.maximise_sn.
 
     Args:
         sn: the dict returned by snr.maximise_sn.
@@ -58,9 +59,9 @@ def write_outputs(sn, I, label, dt, save_all):
     write_sn_summary(f"{label}_SN_summaryfile.txt", sn, dt)
     np.savetxt(f"{label}_SN_DMs.dat", sn["d"] - sn["d"][j])
 
-    plots.plot_sn(sn["d"], sn["SN"], f"{label}_SN.png")
+    plots.plot_sn_vs_dm(sn["d"], sn["SN"], f"{label}_SN.png")
     plots.plot_sn_window(sn["Sx"][j], sn["start"], sn["length"], dt, f"{label}_Max_SN_window.png")
-    plots.plot_profile(I[j], sn["kc"], dt, f"{label}_{dt}us_I_SN_max.png")
+    plots.plot_profile_and_smoothed(I[j], sn["kc"], dt, f"{label}_{dt}us_I_SN_max.png")
 
     if save_all:
         np.save(f"{label}_I_smooth.npy", sn["Sx"])
@@ -68,7 +69,7 @@ def write_outputs(sn, I, label, dt, save_all):
             out.write(f"{j}")
 
 
-def print_result(sn):
+def print_sn_result(sn):
     """Print the S/N-maximising delta DM, its range and the k_c used.
 
     Args:
@@ -85,19 +86,20 @@ def print_result(sn):
 
 
 def main():
-    """Read I(DM, t), find the S/N-maximising DM and write SHRINE's maximise_sn outputs."""
+    """Read the profiles written by generate_profiles.py, find the S/N-maximising DM and write
+    SHRINE's maximise_sn outputs."""
     args = get_args()
     d = np.load(f"{args.label}_DMs.npy")
     I = np.load(f"{args.label}_I_{args.dt}us.npy")
 
     kc = kc_for_sn(I, args)
     sn = maximise_sn(I, d, kc, args.dt)
-    write_outputs(sn, I, args.label, args.dt, args.save_all)
-    print_result(sn)
+    write_sn_outputs(sn, I, args.label, args.dt, args.save_all)
+    print_sn_result(sn)
 
 
 def get_args():
-    """The command-line flags.
+    """Parse the command-line flags.
 
     Returns:
         the parsed flags (argparse.Namespace).

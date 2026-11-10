@@ -1,12 +1,15 @@
 """The summary files written by the scripts, in SHRINE's layout and with SHRINE's key lines.
 
-write_summary writes {label}_structure_summaryfile.txt (maximise_structure.py, optimise_dm.py);
-write_sn_summary writes {label}_SN_summaryfile.txt (maximise_sn.py).
+write_structure_summary writes {label}_structure_summaryfile.txt (maximise_structure.py,
+optimise_dm.py); write_sn_summary writes {label}_SN_summaryfile.txt (maximise_sn.py).
 """
 
 
-def write_summary(path, res, label, dt, DM, kc_note, warnings, grid, saving=False, zap=()):
-    """Write {label}_structure_summaryfile.txt for a result of estimate.dm_uncertainty.
+def write_structure_summary(path, res, label, dt, DM, kc_note, warnings, grid, saving=False,
+                            zap=()):
+    """Write the structure-maximisation summary file, {label}_structure_summaryfile.txt, for a
+    result of estimate.dm_uncertainty: k_c, d_fit +- sigma_DM, Sp_max +- sigma_S, the diagnostics
+    and the warnings.
 
     Args:
         path: output file name.
@@ -15,12 +18,16 @@ def write_summary(path, res, label, dt, DM, kc_note, warnings, grid, saving=Fals
         dt: time resolution, us (-t).
         DM: the DM the input was dedispersed to (-d).
         kc_note: how k_c was chosen.
-        warnings: list of str, from check_grid and the k_c check.
-        grid: (d_low, d_high, step) from check_grid, or None.
+        warnings: list of str, from check_trial_dms and the k_c check.
+        grid: (d_low, d_high, step) from check_trial_dms, or None.
         saving: whether plots were saved (-s).
         zap: the channels left out of the profiles.
     """
-    zap_text = " ".join(str(c) for c in zap)
+    # The zapped channel indices as text, separated by spaces ("none" if there are none).
+    zap_words = []
+    for c in zap:
+        zap_words.append(str(c))
+    zap_text = " ".join(zap_words)
     if not zap_text:
         zap_text = "none"
 
@@ -69,8 +76,8 @@ def write_summary(path, res, label, dt, DM, kc_note, warnings, grid, saving=Fals
 
 
 def write_sn_summary(path, sn, dt):
-    """Write {label}_SN_summaryfile.txt for a result of snr.maximise_sn, in SHRINE's maximise_sn
-    layout.
+    """Write the S/N-maximisation summary file, {label}_SN_summaryfile.txt, for a result of
+    snr.maximise_sn, in SHRINE's maximise_sn layout.
 
     Args:
         path: output file name.

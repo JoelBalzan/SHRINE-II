@@ -14,13 +14,13 @@ Modules, in the order the paper uses them:
     summary     the summary files written by the scripts
     plots       the diagnostic plots
 """
-from .estimate import check_grid, dm_uncertainty
-from .structure import choose_kc, coefficients, structure_parameter
+from .estimate import check_trial_dms, dm_uncertainty
+from .structure import choose_kc, sp_gradient, structure_parameter
 
 __all__ = [
     "dm_uncertainty",
-    "check_grid",
+    "check_trial_dms",
     "choose_kc",
     "structure_parameter",
-    "coefficients",
+    "sp_gradient",
 ]

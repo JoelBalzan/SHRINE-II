@@ -1,4 +1,4 @@
-"""The structure parameter, the coefficients w and the filter cutoff k_c.
+"""The structure parameter Sp, its gradient w (the paper's coefficients) and the filter cutoff k_c.
 
 Paper: Section 2.2 (Eqs. smooth, sp), Section 3.1 (Eq. weights), Section 3.3.1 (Eq. ahat) and
 Appendix 1 (Eqs. Mk, runmean).
@@ -18,7 +18,8 @@ O = 3
 
 
 def filter_response(N, kc):
-    """f(k) and lam_k for modes k = 1..N.
+    """The low-pass filter's response f(k), and the eigenvalues lam_k of D1^T D1, for each DCT mode
+    k = 1..N.
 
     f(k)  = 1 / (1 + (k/k_c)^(2O))     low-pass response (Eq. smooth)
     lam_k = 2 - 2 cos[(k-1) pi/N]      eigenvalues of D1^T D1
@@ -37,7 +38,8 @@ def filter_response(N, kc):
 
 
 def smooth(I, kc):
-    """S x (Eq. smooth), for one profile or for every row of I(d_j, t).
+    """The smoothed profile S x: the profile with each DCT coefficient scaled by the low-pass filter
+    f(k) (Eq. smooth). Works on one profile or on every row of I(d_j, t).
 
     Args:
         I: one profile x, shape (N,), or I(d_j, t), shape (n_d, N), with row j the profile at
@@ -54,7 +56,9 @@ def smooth(I, kc):
 
 
 def structure_parameter(I, kc):
-    """Sp = ||D1 S x|| (Eq. sp), for one profile or for every row of I(d_j, t).
+    """The structure parameter Sp = ||D1 S x|| (Eq. sp): the root sum of squares of the differences
+    between neighbouring samples of the smoothed profile. Works on one profile or on every row of
+    I(d_j, t).
 
     Args:
         I: one profile x, shape (N,), or I(d_j, t), shape (n_d, N), with row j the profile at
@@ -72,8 +76,10 @@ def structure_parameter(I, kc):
     return np.sqrt(Sp_squared)
 
 
-def coefficients(I, kc):
-    """w(t) = (D1 S x)^T D1 S / Sp (Eq. ahat), for one profile or for every row of I(d_j, t).
+def sp_gradient(I, kc):
+    """How much Sp changes per unit change in each sample of the profile: the gradient
+    w(t) = dSp/dx_t = (D1 S x)^T D1 S / Sp, the coefficients w of Eq. ahat. Works on one profile or
+    on every row of I(d_j, t).
 
     This is Eq. weights, w = a_hat^T D1 S, with a_hat estimated from the data as D1 S x / Sp.
     As a column, w = S D1^T D1 S x / Sp, which in the DCT basis is IDCT(lam f^2 c) / Sp.
@@ -98,8 +104,9 @@ def coefficients(I, kc):
     return w_times_Sp / np.expand_dims(Sp, -1)
 
 
-def choose_kc(I, extend=True, verbose=False):
-    """k_c from S23's procedure (Appendix 1), with the paper's extended search unless extend=False.
+def kc_search(I):
+    """Run S23's k_c search and the paper's extended search (Appendix 1), returning every
+    intermediate quantity (for choose_kc and the DCT plot).
 
     M(k)    = largest |DCT coefficient k| over the trial DMs                 (Eq. Mk)
     Mbar(k) = mean of M over the six modes ending at k                       (Eq. runmean)
@@ -109,6 +116,70 @@ def choose_kc(I, extend=True, verbose=False):
     Extended search: if Mbar rises above M_n + 4 sig_Mbar again between k_c and 2 k_c
     (sig_Mbar = spread of Mbar over the upper half), the spectrum has risen above the noise again;
     k_c then moves to the first mode after the last such rise at which Mbar falls back to M_n.
+
+    Indices are 0-based array indices (see choose_kc).
+
+    Args:
+        I: I(d_j, t), shape (n_d, N), over the trial DMs.
+    Returns:
+        dict with
+            M, Mbar: M(k) and Mbar(k), shape (N,) (the first five Mbar are incomplete windows);
+            Mn, rise_level: the noise floor M_n and the level M_n + 4 sig_Mbar;
+            kc_s23: S23's k_c, or None if Mbar never falls to M_n;
+            last_rise: the last index between k_c and 2 k_c with Mbar above rise_level, or None;
+            kc_ext: the extended search's k_c (kc_s23 if there is no rise), or None if Mbar never
+                falls back to M_n after the last rise (or kc_s23 is None).
+    """
+    # M(k): the largest |DCT coefficient| of each mode over the trial DMs (Eq. Mk).
+    M = np.max(np.abs(dct(I, norm="ortho", axis=-1)), axis=0)
+    N = M.size
+
+    # Mbar(k): the running mean of M over the six modes ending at k (Eq. runmean).
+    # The first N values of the full convolution are Mbar[i] = mean(M[i-5..i]).
+    Mbar = np.convolve(M, np.ones(6) / 6)[:N]
+
+    # M_n: the noise floor, the mean of M over the upper half of the modes.
+    Mn = np.mean(M[N // 2:])
+
+    # The extended search's level, M_n + 4 sig_Mbar, with sig_Mbar the spread of Mbar over the
+    # upper half, from six modes above N/2 (as in the paper's code).
+    rise_level = Mn + 4 * np.std(Mbar[N // 2 + 6:])
+
+    out = dict(M=M, Mbar=Mbar, Mn=Mn, rise_level=rise_level,
+               kc_s23=None, last_rise=None, kc_ext=None)
+
+    # S23: the first mode at which Mbar falls to the noise floor, starting at the first full
+    # six-mode window (index 5).
+    for i in range(5, N):
+        if Mbar[i] <= Mn:
+            out["kc_s23"] = i
+            break
+    if out["kc_s23"] is None:
+        return out
+    kc = out["kc_s23"]
+
+    # The last mode between k_c and 2 k_c (and below N/2) at which Mbar is above the level.
+    for i in range(kc, min(2 * kc, N // 2)):
+        if Mbar[i] > rise_level:
+            out["last_rise"] = i
+    if out["last_rise"] is None:
+        out["kc_ext"] = kc
+        return out
+
+    # The spectrum rose above the noise again: k_c moves to the first mode from the last rise on at
+    # which Mbar falls back to the noise floor.
+    for i in range(out["last_rise"], N):
+        if Mbar[i] <= Mn:
+            out["kc_ext"] = i
+            break
+    return out
+
+
+def choose_kc(I, extend=True, verbose=False):
+    """The filter cutoff k_c: the mode at which the DCT spectrum of the profiles falls to the noise
+    floor (S23's procedure, with the paper's extended search unless extend=False; Appendix 1).
+
+    The search itself is in kc_search.
 
     As in SHRINE's dm_processing.get_kc, k_c is a 0-based array index, used as it is in f(k) with
     k = 1..N, so it is one mode below the 1-based mode at which Mbar falls to the floor. The k_c
@@ -125,24 +196,11 @@ def choose_kc(I, extend=True, verbose=False):
         RuntimeError if Mbar never falls to the noise floor, or (extended search) never falls back
         to it after rising above the noise again.
     """
-    # M(k): the largest |DCT coefficient| of each mode over the trial DMs (Eq. Mk).
-    M = np.max(np.abs(dct(I, norm="ortho", axis=-1)), axis=0)
-    N = M.size
+    search = kc_search(I)
+    kc = search["kc_s23"]
+    Mn = search["Mn"]
+    rise_level = search["rise_level"]
 
-    # Mbar(k): the running mean of M over the six modes ending at k (Eq. runmean).
-    # The first N values of the full convolution are Mbar[i] = mean(M[i-5..i]).
-    Mbar = np.convolve(M, np.ones(6) / 6)[:N]
-
-    # M_n: the noise floor, the mean of M over the upper half of the modes.
-    Mn = np.mean(M[N // 2:])
-
-    # S23: the first mode at which Mbar falls to the noise floor, starting at the first full
-    # six-mode window (index 5).
-    kc = None
-    for i in range(5, N):
-        if Mbar[i] <= Mn:
-            kc = i
-            break
     if kc is None:
         raise RuntimeError("could not find k_c: the DCT spectrum never falls to the noise floor")
     if verbose:
@@ -151,28 +209,18 @@ def choose_kc(I, extend=True, verbose=False):
     if not extend:
         return kc
 
-    # Extended search: the level M_n + 4 sig_Mbar, with sig_Mbar the spread of Mbar over the upper
-    # half, from six modes above N/2 (as in the paper's code).
-    rise_level = Mn + 4 * np.std(Mbar[N // 2 + 6:])
-
-    # The last mode between k_c and 2 k_c (and below N/2) at which Mbar is above that level.
-    last_rise = None
-    for i in range(kc, min(2 * kc, N // 2)):
-        if Mbar[i] > rise_level:
-            last_rise = i
+    last_rise = search["last_rise"]
     if last_rise is None:
         if verbose:
             print(f"  k_c, extended search (App. 1): Mbar stays below M_n + 4 sig_Mbar = "
                   f"{rise_level:.4g} between k_c and 2 k_c, so k_c = {kc}")
         return kc
 
-    # The spectrum rose above the noise again: k_c moves to the first mode from the last rise on at
-    # which Mbar falls back to the noise floor.
-    for i in range(last_rise, N):
-        if Mbar[i] <= Mn:
-            if verbose:
-                print(f"  k_c, extended search (App. 1): Mbar rises above M_n + 4 sig_Mbar = "
-                      f"{rise_level:.4g} again at mode {last_rise}, so k_c moves from {kc} to {i}")
-            return i
-    raise RuntimeError("could not find k_c: after rising above the noise again at mode "
-                       f"{last_rise}, the DCT spectrum never falls back to the noise floor")
+    kc_ext = search["kc_ext"]
+    if kc_ext is None:
+        raise RuntimeError("could not find k_c: after rising above the noise again at mode "
+                           f"{last_rise}, the DCT spectrum never falls back to the noise floor")
+    if verbose:
+        print(f"  k_c, extended search (App. 1): Mbar rises above M_n + 4 sig_Mbar = "
+              f"{rise_level:.4g} again at mode {last_rise}, so k_c moves from {kc} to {kc_ext}")
+    return kc_ext

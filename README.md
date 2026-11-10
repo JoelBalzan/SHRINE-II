@@ -22,8 +22,13 @@ or section each line evaluates.
 pip install -e .            # or run the scripts in python/ directly from a checkout
 python -m pytest            # optional: the tests in tests/
 ```
+### Requirements
 
-Needs numpy, scipy and matplotlib.
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install numpy scipy matplotlib
+```
 
 ## Use
 
@@ -43,7 +48,7 @@ python python/maximise_sn.py -l <label> -t 25 -s
 Or in one go from the voltages with `optimise_dm.py`:
 
 ```bash
-# Structure maximisation, refining the trial DMs until they are fine enough
+# Structure maximisation: generate_profiles.py and maximise_structure.py in one go
 python python/optimise_dm.py -l <label> -d <DM> -L -1 -H 1 --dDM_auto -t 25 -f <f0 MHz> -I <I file> -s
 
 # ... with the S/N-maximising DM too (as SHRINE's --do_sn)
@@ -56,9 +61,24 @@ python python/optimise_dm.py -l <label> -d <DM> -L -1 -H 1 --dDM 0.01 -t 25 -f <
 | Script | Reads | Writes |
 |---|---|---|
 | `generate_profiles.py` | `{label}_X_t_{DM}.npy`, `{label}_Y_t_{DM}.npy`, the `-I` file (for the crop) | `{label}_DMs.npy/.dat`, `{label}_I_{dt}us.npy/.dat`, `{label}_zap.txt` (the zapped channels), `{label}_profile_summaryfile.txt` |
-| `maximise_structure.py` | `{label}_DMs.npy`, `{label}_I_{dt}us.npy` | `{label}_structure_summaryfile.txt`, `{label}_SPs.dat`, `{label}_I_smooth_{dt}us.npy`; with `-s`, `DM.txt` and plots |
+| `maximise_structure.py` | `{label}_DMs.npy`, `{label}_I_{dt}us.npy` | `{label}_structure_summaryfile.txt`, `{label}_SPs.dat`, `{label}_I_smooth_{dt}us.npy`; with `-s`, `DM.txt` and the plots below |
 | `maximise_sn.py` | `{label}_DMs.npy`, `{label}_I_{dt}us.npy` | `{label}_SN_summaryfile.txt`, `{label}_SN_DMs.dat`, `{label}_SN.png`, `{label}_Max_SN_window.png`, `{label}_{dt}us_I_SN_max.png`; with `-s`, `{label}_I_smooth.npy` and `DM.txt` |
-| `optimise_dm.py` | as `generate_profiles.py` | as `generate_profiles.py` and `maximise_structure.py`, for the last pass; earlier passes' profiles with `_pass<n>`; with `--do_sn`, as `maximise_sn.py` (on pass 1); with `--sn_only`, as `generate_profiles.py` and `maximise_sn.py` only |
+| `optimise_dm.py` | as `generate_profiles.py` | as `generate_profiles.py` (except its summary file) and `maximise_structure.py`; with `--do_sn`, as `maximise_sn.py` too; with `--sn_only`, as `generate_profiles.py` and `maximise_sn.py` only |
+
+With `-s`, `maximise_structure.py` (and `optimise_dm.py`) write SHRINE's plots, `{label}_{dt}us_*.png`:
+
+| Plot | Shows |
+|---|---|
+| `_structure_parameter.png` | S(d) with ±σ_S, the fit window, the parabola and d_fit ± σ_DM (as the paper's Figure 6) |
+| `_DCT_v_k_index.png` | \|DCT coefficients\| of every profile against mode, with the k_c search (App. 1): the running mean M̄(k), the noise floor M_n and M_n + 4σ_M̄, S23's k_c, the extended search's k_c if it moved, and a `-kc` k_c; the k_c used is marked |
+| `_I_max.png` | the profile and S x at the trial DM nearest d_fit |
+| `_I_DM_t.png`, `_I_DM_t_smoothed.png` | I(DM, t) and S x over DM and t |
+| `_detrended_noise.png` | the residual I − S x over DM and t (S23's residual; the paper argues it is not the noise) |
+| `_noise_max.png` | the noise σ_t² is taken from: the profile at d_max reconstructed from its DCT modes k > k_min, rescaled to the full noise variance, with ±σ_t (paper Section 3.3.2) |
+
+SHRINE's plots of S23's uncertainties (`_uncertainty`, `_relative_uncertainty`, `_relative_detrended_noise`,
+`_adjusted_SP`) are not made, since those uncertainties are not computed, and nor is `_DM_index` (a straight line
+for the uniformly spaced trial DMs every script makes).
 
 Flags are SHRINE's, with these additions and changes:
 
@@ -76,11 +96,11 @@ Flags are SHRINE's, with these additions and changes:
   one-sample DM step, the DM change that moves the bottom of the band by one output sample (`-t`) relative to the top,
   from `-f` and `-b` (`profiles.one_sample_dm_step`). It replaces `--dDM`/`--cDM`; `-L`/`-H` still set the range.
   For CRAFT's 336 MHz at 1271.5 MHz it is 0.00071 pc cm^-3 per us of `-t` (0.0071 at 10 us).
-  Finer steps still change the profile, by fractions of a sample, and when sigma_DM is smaller than this step,
-  `optimise_dm.py` refines below it.
+  Finer steps still change the profile, by fractions of a sample; when sigma_DM is smaller than this step, the
+  summary suggests a finer `--dDM`.
 - `--do_sn`, in `optimise_dm.py`: also find the S/N-maximising DM, as SHRINE's `--do_sn`.
-- `--sn_only`, in `optimise_dm.py`: find only the S/N-maximising DM, on the trial DMs given, with no structure
-  maximisation and no refinement (the standalone S/N mode).
+- `--sn_only`, in `optimise_dm.py`: find only the S/N-maximising DM, with no structure maximisation (the standalone
+  S/N mode).
 - `-f/--f0` is required in `generate_profiles.py`, `maximise_structure.py` and `optimise_dm.py`: the profiles need it,
   and sigma_DM needs each channel's dispersion delay (with `-b/--bw` and `--nchan`).
 - `-d/--DM` is read as text and `-b/--bw` as a number in every script, so the summary's `Initial DM:` is exactly what
@@ -95,7 +115,8 @@ S23's own uncertainties are not computed.
 The summary file keeps SHRINE's key lines (`kc:`, `Structure Maximising Delta DM:`,
 `Uncertainty in Structure Maximising Delta DM: +/-...`, `Structure Parameter at Maximum: ... +/- ...`) and adds the fit
 window, the relative curvature error, sqrt(<||e||^2>)/S and any warnings. If the trial DMs are too coarse, it suggests
-`-L -H --dDM` for a second run of `generate_profiles.py`, which `optimise_dm.py` does automatically.
+`-L -H --dDM` for a second run of `generate_profiles.py` or `optimise_dm.py`. The trial DMs are never refined
+automatically: the step is yours to set.
 
 ### S/N maximisation
 
@@ -140,12 +161,12 @@ they are off by default so that Monte Carlo loops stay quiet.
 | Sp(d_j) = \|\|D1 S x(d_j)\|\| at every trial DM | `structure.structure_parameter` | Eq. 4 (`eq:sp`), filter Eq. 3 (`eq:smooth`) |
 | d_max, the trial DM with the largest Sp | `j_max = argmax(Sp)` | Sec. 2.2 |
 | sigma_t^2 from the profile at d_max | `noise.noise_variance` | Sec. 3.3.2 (`sec:sigt`) |
-| w at d_max, w = (D1 S x)^T D1 S / Sp | `structure.coefficients` | Eq. 28 (`eq:ahat`), Eq. 19 (`eq:weights`) |
+| w at d_max, w = (D1 S x)^T D1 S / Sp | `structure.sp_gradient` | Eq. 28 (`eq:ahat`), Eq. 19 (`eq:weights`) |
 | sigma_S = sqrt(sum_t w_t^2 sigma_t^2) | `noise.sigma_S` | Eq. 20 (`eq:sigS`) |
 | fit window: contiguous trial DMs with Sp >= Sp_max - sigma_S | `fit.fit_window` | Sec. 3.3.3 (`sec:fit`) |
-| parabola about its vertex: d_fit, c0, c1, c2, and B | `fit.parabola` | Eqs. 29, 32 (`eq:parab`, `eq:lsq`) |
-| w(t; d_j) at every trial DM in the window | `structure.coefficients` | Eq. 28 (`eq:ahat`) |
-| V_jl = Cov[e_par(d_j), e_par(d_l)] | `covariance.covariance` | App. 2, Eq. 41 (`eq:cov`) |
+| parabola about its vertex: d_fit, c0, c1, c2, and B | `fit.fit_parabola` | Eqs. 29, 32 (`eq:parab`, `eq:lsq`) |
+| w(t; d_j) at every trial DM in the window | `structure.sp_gradient` | Eq. 28 (`eq:ahat`) |
+| V_jl = Cov[e_par(d_j), e_par(d_l)] | `covariance.noise_covariance` | App. 2, Eq. 41 (`eq:cov`) |
 | std[c1]^2 = sum_jl B_1j B_1l V_jl | `B[1] @ V @ B[1]` | Eq. 34 (`eq:varc1`) |
 | sigma_DM = std[c1] / \|2 c2\| | `sig_DM` | Eq. 35 (`eq:final`) |
 | relative curvature error std[c2]/\|c2\| | `c2_err` | Eq. 36 (`eq:c2err`) |
@@ -159,7 +180,7 @@ Names used throughout:
 | `d` | d_j | trial (delta-)DMs, uniformly spaced |
 | `kc`, `f`, `lam` | k_c, f(k), λ_k | filter cutoff and response, eigenvalues of D1^T D1 (k_c is a 0-based index used as the mode number in f(k), as in S23, SHRINE and the paper) |
 | `Sp`, `Sp_max` | 𝒮(d_j), 𝒮_max | structure parameter |
-| `w`, `W` | w, w(t; d_j) | coefficients at one trial DM, at every trial DM in the window |
+| `w`, `W` | w, w(t; d_j) | gradient of Sp with respect to each sample (the paper's coefficients), at one trial DM and at every trial DM in the window |
 | `sig2` | σ_t² | profile-noise variance at each sample |
 | `sig_S` | σ_𝒮 | structure parameter uncertainty |
 | `win`, `n_win` | fit window | which trial DMs are fitted, and how many |
@@ -197,8 +218,9 @@ out the zapped ones.
 ## Using it on real data
 
 - **Trial-DM step.** The paper's simulations use a step of sigma_DM/6, with trial DMs out to ~15 sigma_DM. You don't
-  know sigma_DM before the first run, so either rerun `generate_profiles.py` with the suggested grid or use
-  `optimise_dm.py`. It warns if the step is coarser than sigma_DM/3.
+  know sigma_DM before the first run; the scripts warn if the step is coarser than sigma_DM/3 and suggest a grid for a
+  rerun. A coarser step still gives d_fit, with sigma_DM from fewer trial DMs in the fit window; at least three are
+  needed.
 - **Uniform trial DMs.** The trial DMs are assumed to be uniformly spaced, as every script makes them: the covariance V
   takes the step as d[1] − d[0], and this is not checked. If you make I(DM, t) yourself, keep the step constant.
 - **The crop.** The burst is found as the brightest 1-ms bin of the `-I` file (assumed to be at 1 µs), summed over all

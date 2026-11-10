@@ -9,8 +9,35 @@ from scipy.ndimage import uniform_filter1d
 from .structure import filter_response
 
 
+def high_mode_noise(x, kc):
+    """The noise in one profile x, isolated by rebuilding x from its DCT modes k > k_min only
+    (Sec. 3.3.2).
+
+    k_min = max(N/4, 2 k_c), with 2 k_c capped at 3N/4. These modes lie above the burst's power, so
+    the reconstruction holds only noise, with the fraction 1 - k_min/N of its variance.
+
+    Args:
+        x: one profile, shape (N,).
+        kc: filter cutoff k_c, which sets k_min.
+    Returns:
+        noise_only: the reconstruction, shape (N,), in the units of x.
+        k_min: the number of low modes removed.
+    """
+    N = x.size
+
+    # k_min = max(N/4, 2 k_c), with 2 k_c capped at 3N/4 so that at least N/4 modes are kept.
+    k_min = max(N // 4, min(2 * kc, 3 * N // 4))
+
+    # Remove modes k = 1..k_min (array indices 0..k_min-1): what is left is noise only.
+    c = dct(x, norm="ortho")
+    c[:k_min] = 0
+    noise_only = idct(c, norm="ortho")
+    return noise_only, k_min
+
+
 def noise_variance(x, kc, n_avg=15, verbose=False):
-    """sigma_t^2 at every sample of one profile x (Section 3.3.2).
+    """The noise variance sigma_t^2 at every sample of one profile x, from its high DCT modes
+    (Section 3.3.2).
 
     1. Keep only the DCT modes k > k_min, where k_min = max(N/4, 2 k_c), at most 3N/4. These lie
        above the burst's power, so the reconstruction holds only noise.
@@ -27,13 +54,8 @@ def noise_variance(x, kc, n_avg=15, verbose=False):
     """
     N = x.size
 
-    # k_min = max(N/4, 2 k_c), with 2 k_c capped at 3N/4 so that at least N/4 modes are kept.
-    k_min = max(N // 4, min(2 * kc, 3 * N // 4))
-
-    # 1. Remove modes k = 1..k_min (array indices 0..k_min-1): what is left is noise only.
-    c = dct(x, norm="ortho")
-    c[:k_min] = 0
-    noise_only = idct(c, norm="ortho")
+    # 1. The noise only: x reconstructed from the DCT modes k > k_min.
+    noise_only, k_min = high_mode_noise(x, kc)
 
     # 2. The local mean square of the noise-only profile.
     mean_square = uniform_filter1d(noise_only**2, size=n_avg, mode="nearest")
@@ -48,10 +70,11 @@ def noise_variance(x, kc, n_avg=15, verbose=False):
 
 
 def sigma_S(w, sig2):
-    """sigma_S = sqrt( sum_t w_t^2 sigma_t^2 )   (Eq. sigS).
+    """The 1-sigma uncertainty of the structure parameter, sigma_S = sqrt( sum_t w_t^2 sigma_t^2 )
+    (Eq. sigS).
 
     Args:
-        w: coefficients at one trial DM, shape (N,) (from structure.coefficients).
+        w: coefficients at one trial DM, shape (N,) (from structure.sp_gradient).
         sig2: sigma_t^2, shape (N,) (from noise_variance).
     Returns:
         sigma_S, a float in the units of Sp.
@@ -59,9 +82,9 @@ def sigma_S(w, sig2):
     return np.sqrt(np.sum(w**2 * sig2))
 
 
-def noise_ratio(sig2, kc, Sp):
-    """Typical length of the filtered noise relative to the structure parameter,
-    sqrt(<||e||^2>) / Sp.
+def filtered_noise_ratio(sig2, kc, Sp):
+    """The size of the filtered noise relative to the structure parameter, sqrt(<||e||^2>) / Sp: a
+    check that the first-order expansion behind sigma_S and sigma_DM holds.
 
     The expansion behind the uncertainties needs ||e|| << ||a|| (Eq. small); Section 5.2 discusses
     where it holds (the simulations span ~0.3 at S/N 15 to ~0.07 at S/N 200). For noise

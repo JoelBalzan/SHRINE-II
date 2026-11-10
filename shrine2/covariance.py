@@ -21,8 +21,11 @@ The trial DMs must be uniformly spaced: then V_jl depends on the lag only throug
 import numpy as np
 
 
-def covariance(W, sig2, dt_nu, step, share=None):
-    """V (n x n) for n consecutive, uniformly spaced trial DMs.
+def noise_covariance(W, sig2, dt_nu, step, share=None):
+    """The covariance of the noise in Sp between each pair of trial DMs in the fit window,
+    V_jl = Cov[e_par(d_j), e_par(d_l)] (Appendix 2, Eq. cov).
+
+    The n trial DMs must be consecutive and uniformly spaced.
 
     Args:
         W: w(t; d_j) at each trial DM in the window, shape (n, N), one row per trial DM, in order
