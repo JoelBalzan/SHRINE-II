@@ -29,33 +29,6 @@ from shrine2.structure import smooth
 from shrine2.summary import write_structure_summary
 
 
-def read_zapped_channels(args):
-    """The channels left out of the profiles: from --zap/--zap_edges if given, otherwise from
-    {label}_zap.txt (written by generate_profiles.py) if it exists.
-
-    The channel delays must describe the channels generate_profiles.py actually summed, which it
-    records in {label}_zap.txt.
-
-    Args:
-        args: the parsed flags; uses --zap, --zap_edges and -l.
-    Returns:
-        zap: sorted array of channel indices (empty if none).
-        warnings: list of str; one warning if the zapped channels were neither given nor recorded.
-    """
-    if args.zap or args.zap_edges:
-        return parse_zapped_channels(args.zap, args.zap_edges), []
-
-    path = Path(f"{args.label}_zap.txt")
-    if path.exists():
-        return np.array(path.read_text().split(), dtype=int), []
-
-    # No record, as for profiles from SHRINE's own generate_profiles.py, which always leaves out
-    # channel 335.
-    warning = (f"no --zap, --zap_edges or {args.label}_zap.txt: assuming no channels were zapped "
-               "(profiles from SHRINE's own generate_profiles.py need --zap 335)")
-    return np.array([], dtype=int), [warning]
-
-
 def choose_kc_from_flags(I, args, verbose=False):
     """The filter cutoff k_c: -kc if given, otherwise the automatic choice (choose_kc), with a note
     on how it was chosen and a warning if a forced k_c is below the automatic one.
@@ -99,52 +72,6 @@ def choose_kc_from_flags(I, args, verbose=False):
     return kc, note, warnings
 
 
-def dm_uncertainty_from_flags(I, d, kc, args, zap=(), verbose=False):
-    """The structure-maximising DM and sigma_DM (dm_uncertainty), with each channel's dispersion
-    delay and noise share, which sigma_DM needs, worked out from the flags (-f, -b, --nchan, -t)
-    and the zapped channels.
-
-    Args:
-        I: I(d_j, t), shape (n_d, N).
-        d: the trial DMs, shape (n_d,), uniformly spaced, pc cm^-3.
-        kc: the filter cutoff k_c.
-        args: the parsed flags; uses -f, -b, --nchan and -t.
-        zap: the channels left out of the profiles.
-        verbose: print the channel model and each key result of Section 3.3.
-    Returns:
-        the dict returned by estimate.dm_uncertainty.
-    """
-    # Each summed channel's delay (us per pc cm^-3) and share of the noise; dt_nu is in samples.
-    tau, share = channel_delays(args.f0, args.bw, args.nchan, zap)
-    dt_nu = tau / args.dt
-    if verbose:
-        print(f"  channel delays (App. 2, Eq. epchan): {share.sum():.0f} channels summed "
-              f"({len(zap)} zapped), dt_nu from {dt_nu.min():.4g} to {dt_nu.max():.4g} samples "
-              f"per pc cm^-3")
-    return dm_uncertainty(I, d, kc, dt_nu, share, verbose=verbose)
-
-
-def low_sn_warnings(res):
-    """A warning pointing to S/N maximisation when the burst looks too faint for structure
-    maximisation.
-
-    The sign is the filtered noise not being small compared with the structure
-    (sqrt(<||e||^2>)/Sp > 0.3, Sec. 5.2), or a poorly determined curvature (std[c2]/|c2| > 0.5).
-
-    Args:
-        res: the dict returned by estimate.dm_uncertainty.
-    Returns:
-        list of str: one warning, or none.
-    """
-    faint = res["e_ratio"] > 0.3
-    if res["ok"] and res["c2_err"] > 0.5:
-        faint = True
-    if not faint:
-        return []
-    return ["structure maximisation may be unreliable for this burst: compare with the "
-            "S/N-maximising DM (maximise_sn.py, or optimise_dm.py --do_sn or --sn_only)"]
-
-
 def save_plots(res, I, Sx, args):
     """Write DM.txt and the diagnostic plots ({label}_{dt}us_*.png), as SHRINE does with -s.
 
@@ -182,33 +109,6 @@ def save_plots(res, I, Sx, args):
                               f"{tag}_noise_max.png")
 
 
-def write_structure_outputs(res, I, args, kc_note, warnings, grid, zap):
-    """Write every output file of maximise_structure.py for a result of estimate.dm_uncertainty.
-
-    {label}_SPs.dat, {label}_I_smooth_{dt}us.npy, {label}_structure_summaryfile.txt and, with -s,
-    DM.txt and the plots.
-
-    Args:
-        res: the dict returned by estimate.dm_uncertainty.
-        I: I(d_j, t), shape (n_d, N).
-        args: the parsed flags; uses -l, -t, -d and -s.
-        kc_note: how k_c was chosen.
-        warnings: list of str, for the summary file.
-        grid: (d_low, d_high, step) from check_trial_dms, or None.
-        zap: the channels left out of the profiles.
-    """
-    np.savetxt(f"{args.label}_SPs.dat", res["Sp"])
-
-    # The smoothed profiles, as SHRINE writes them.
-    Sx = smooth(I, res["kc"])
-    np.save(f"{args.label}_I_smooth_{args.dt}us.npy", Sx)
-
-    write_structure_summary(f"{args.label}_structure_summaryfile.txt", res, args.label, args.dt,
-                            args.DM, kc_note, warnings, grid, args.save_all, zap)
-    if args.save_all:
-        save_plots(res, I, Sx, args)
-
-
 def run_structure_maximisation(I, d, args, zap, extra_warnings=()):
     """Run structure maximisation on I(d_j, t) from start to finish: choose k_c, find the DM and
     sigma_DM, check the trial DMs, write the outputs and print the key results.
@@ -225,11 +125,42 @@ def run_structure_maximisation(I, d, args, zap, extra_warnings=()):
     print(f"Structure maximisation (paper Section 3.3): {d.size} trial DMs, "
           f"step {d[1] - d[0]:.3g}, {I.shape[1]} samples of {args.dt} us")
     kc, kc_note, kc_warnings = choose_kc_from_flags(I, args, verbose=True)
-    res = dm_uncertainty_from_flags(I, d, kc, args, zap, verbose=True)
-    grid_warnings, grid = check_trial_dms(res)
-    warnings = list(extra_warnings) + kc_warnings + grid_warnings + low_sn_warnings(res)
 
-    write_structure_outputs(res, I, args, kc_note, warnings, grid, zap)
+    # Each summed channel's dispersion delay (us per pc cm^-3) and share of the noise, which
+    # sigma_DM needs (from -f, -b, --nchan and the zapped channels); dt_nu is the delay in samples.
+    tau, share = channel_delays(args.f0, args.bw, args.nchan, zap)
+    dt_nu = tau / args.dt
+    print(f"  channel delays (App. 2, Eq. epchan): {share.sum():.0f} channels summed "
+          f"({len(zap)} zapped), dt_nu from {dt_nu.min():.4g} to {dt_nu.max():.4g} samples "
+          f"per pc cm^-3")
+
+    # The structure-maximising DM and sigma_DM (Section 3.3).
+    res = dm_uncertainty(I, d, kc, dt_nu, share, verbose=True)
+
+    # Warnings, in the order they go in the summary file: the zapped channels, k_c, the trial DMs.
+    grid_warnings, grid = check_trial_dms(res)
+    warnings = list(extra_warnings) + kc_warnings + grid_warnings
+
+    # A burst too faint for structure maximisation: the filtered noise is not small compared with
+    # the structure (sqrt(<||e||^2>)/Sp > 0.3, Sec. 5.2), or the curvature is poorly determined
+    # (std[c2]/|c2| > 0.5). Point to S/N maximisation.
+    faint = res["e_ratio"] > 0.3
+    if res["ok"] and res["c2_err"] > 0.5:
+        faint = True
+    if faint:
+        warnings.append("structure maximisation may be unreliable for this burst: compare with "
+                        "the S/N-maximising DM (maximise_sn.py, or optimise_dm.py --do_sn or "
+                        "--sn_only)")
+
+    # The outputs: Sp at every trial DM, the smoothed profiles S x (as SHRINE writes them), the
+    # summary file and, with -s, DM.txt and the plots.
+    np.savetxt(f"{args.label}_SPs.dat", res["Sp"])
+    Sx = smooth(I, res["kc"])
+    np.save(f"{args.label}_I_smooth_{args.dt}us.npy", Sx)
+    write_structure_summary(f"{args.label}_structure_summaryfile.txt", res, args.label, args.dt,
+                            args.DM, kc_note, warnings, grid, args.save_all, zap)
+    if args.save_all:
+        save_plots(res, I, Sx, args)
 
     if res["ok"]:
         print(f"delta DM = {res['d_fit']:.6g} +/- {res['sig_DM']:.3g} (1 sigma), k_c = {res['kc']}")
@@ -246,7 +177,24 @@ def main():
     args = get_args()
     d = np.load(f"{args.label}_DMs.npy")
     I = np.load(f"{args.label}_I_{args.dt}us.npy")
-    zap, zap_warnings = read_zapped_channels(args)
+
+    # The channels left out of the profiles, which the channel delays must match: from
+    # --zap/--zap_edges if given, otherwise from {label}_zap.txt, where generate_profiles.py
+    # records the channels it left out.
+    zap_file = Path(f"{args.label}_zap.txt")
+    zap_warnings = []
+    if args.zap or args.zap_edges:
+        zap = parse_zapped_channels(args.zap, args.zap_edges)
+    elif zap_file.exists():
+        zap = np.array(zap_file.read_text().split(), dtype=int)
+    else:
+        # No record, as for profiles from SHRINE's own generate_profiles.py, which always leaves
+        # out channel 335.
+        zap = np.array([], dtype=int)
+        zap_warnings.append(f"no --zap, --zap_edges or {args.label}_zap.txt: assuming no channels "
+                            "were zapped (profiles from SHRINE's own generate_profiles.py need "
+                            "--zap 335)")
+
     run_structure_maximisation(I, d, args, zap, zap_warnings)
 
 

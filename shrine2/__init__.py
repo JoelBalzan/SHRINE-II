@@ -15,12 +15,12 @@ Modules, in the order the paper uses them:
     plots       the diagnostic plots
 """
 from .estimate import check_trial_dms, dm_uncertainty
-from .structure import choose_kc, sp_gradient, structure_parameter
+from .structure import choose_kc, coefficients, structure_parameter
 
 __all__ = [
     "dm_uncertainty",
     "check_trial_dms",
     "choose_kc",
     "structure_parameter",
-    "sp_gradient",
+    "coefficients",
 ]

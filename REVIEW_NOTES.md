@@ -14,7 +14,7 @@ current ones (see "Renamed functions" below).
 | 6 | A negative `B[1] V B[1]` or `B[2] V B[2]` was clipped to 0 without a warning, giving sigma_DM = 0. That would also have made `check_trial_dms` suggest a step of 0 | `dm_uncertainty` returns `ok = False` and says why |
 | 7a | After a rise in the extended k_c search, if Mbar never fell back to the floor, `choose_kc` silently returned `N // 2` | Raises `RuntimeError`, like the S23 case; `-kc` still overrides it. This case is effectively unreachable |
 | 10 | Profiles made by SHRINE's own `generate_profiles.py` (no `{label}_zap.txt`, channel 335 always dropped) were modelled with no zapped channels | `maximise_structure.py` warns, in the output and the summary file, when it has neither `--zap`/`--zap_edges` nor the zap file. The README says to use `--zap 335` |
-| 11 | `optimise_dm.py` re-ran `choose_kc` on every pass and discarded the result, kept k_c by overwriting `args.force_kc`, and failed with `--max_passes 0` | k_c is chosen once on pass 1 (`maximise_structure.choose_kc_from_flags`) and passed to `maximise_structure.dm_uncertainty_from_flags`. `--max_passes < 1` is rejected. Results are unchanged. (The passes were later removed altogether: `optimise_dm.py` now runs once, on the trial DMs given.) |
+| 11 | `optimise_dm.py` re-ran `choose_kc` on every pass and discarded the result, kept k_c by overwriting `args.force_kc`, and failed with `--max_passes 0` | k_c is chosen once on pass 1 (`maximise_structure.choose_kc_from_flags`) and passed to `dm_uncertainty`. `--max_passes < 1` is rejected. Results are unchanged. (The passes were later removed altogether: `optimise_dm.py` now runs once, on the trial DMs given.) |
 | 12 | `plots.plot_I_DM_t` drew each row half a trial-DM step off its DM | The image extends half a step beyond the first and last trial DMs |
 | 13 | `checks/compare_final_sdm.py` crashed if every realisation of a case failed | It prints the failures instead |
 | — | `profiles.US_PER_SAMPLE` was unused | Removed |
@@ -35,11 +35,11 @@ reported as a failure (18 tests in all).
 
 On 2026-11-10, functions whose names did not say what they do were renamed, and docstrings that only cited the
 paper now say first, in plain words, what the function returns or does. Behaviour is unchanged (checked bit for
-bit). Of the old names, only `check_grid` and `coefficients` were exported from `shrine2`.
+bit). Of the old names, only `check_grid` was exported from `shrine2`.
 
 | Module | Old name | New name |
 |---|---|---|
-| `shrine2.structure` | `coefficients` | `sp_gradient` |
+| `shrine2.structure` | `coefficients` | `sp_gradient`, then back to `coefficients` to match the paper |
 | `shrine2.noise` | `noise_ratio` | `filtered_noise_ratio` |
 | `shrine2.fit` | `least_squares` | `parabola_least_squares` |
 | `shrine2.fit` | `parabola` | `fit_parabola` |
@@ -56,9 +56,9 @@ bit). Of the old names, only `check_grid` and `coefficients` were exported from 
 | `shrine2.plots` | `plot_profile` | `plot_profile_and_smoothed` |
 | `shrine2.plots` | `plot_sn` | `plot_sn_vs_dm` |
 | `shrine2.plots` | `plot_noise_max` | `plot_noise_at_d_max` |
-| `python/maximise_structure.py` | `zapped` | `read_zapped_channels` |
-| `python/maximise_structure.py` | `estimate` | `dm_uncertainty_from_flags` |
-| `python/maximise_structure.py` | `write_outputs` | `write_structure_outputs` |
+| `python/maximise_structure.py` | `zapped` | `read_zapped_channels`, later folded into `main` |
+| `python/maximise_structure.py` | `estimate` | `dm_uncertainty_from_flags`, later folded into `run_structure_maximisation` |
+| `python/maximise_structure.py` | `write_outputs` | `write_structure_outputs`, later folded into `run_structure_maximisation` |
 | `python/maximise_structure.py` | `structure_maximisation` | `run_structure_maximisation` |
 | `python/maximise_sn.py` | `write_outputs` | `write_sn_outputs` |
 | `python/maximise_sn.py` | `print_result` | `print_sn_result` |
@@ -68,8 +68,20 @@ bit). Of the old names, only `check_grid` and `coefficients` were exported from 
 | `checks/check_delays.py` | `arrival` | `arrival_time` |
 | `checks/compare_final_sdm.py` | `compare` | `compare_one_case` |
 
+Later the same day, four short helpers in `maximise_structure.py` that were each called only once
+(`read_zapped_channels`, `dm_uncertainty_from_flags`, `low_sn_warnings` and `write_structure_outputs`) were
+folded into their callers, `main` and `run_structure_maximisation`. Outputs are unchanged (checked bit for bit).
+
 ## Other notes
 
+- **Sp and w follow the paper's equations (2026-11-10).** `structure_parameter` and `coefficients` now compute
+  ||D1 S x|| and (D1 S x)^T D1 S one factor at a time, as the paper writes them, instead of the shortcut
+  ||D1 S x||^2 = sum_k lam_k f(k)^2 c_k^2 through the eigenvalues of D1^T D1. D1 is a sparse matrix
+  (`forward_difference_matrix`); S is applied as `smooth`, since as a dense N x N matrix it would take ~0.8 GB at
+  N = 10,000 (so the final row times S is the smoothed row, S being symmetric). Results agree with the previous code
+  to rounding (at most 1.9e-13 relative), not bit for bit, and with the paper's code to 4e-13. `pyproject.toml` now
+  requires scipy >= 1.11 (for `scipy.sparse.diags_array`).
+  `filter_response` now returns f(k) only; lam_k is computed in `noise.filtered_noise_ratio`, its one remaining use.
 - **Untracked tests:** `tests/` and `checks/` are listed in `.gitignore`, so they are not under version control.
   Remove those two lines to track them.
 - **Bit-level results depend on how an expression is written.** NumPy may evaluate `a * b` with the operands

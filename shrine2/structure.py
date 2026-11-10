@@ -1,16 +1,18 @@
-"""The structure parameter Sp, its gradient w (the paper's coefficients) and the filter cutoff k_c.
+"""The structure parameter Sp, the coefficients w and the filter cutoff k_c.
 
 Paper: Section 2.2 (Eqs. smooth, sp), Section 3.1 (Eq. weights), Section 3.3.1 (Eq. ahat) and
 Appendix 1 (Eqs. Mk, runmean).
 
-Everything is done in the DCT basis. With c = C^T x, the orthonormal type-II DCT of a profile x:
-
-    S x       ->  f(k) c_k                         the low-pass filter (Eq. smooth)
-    D1^T D1   ->  lam_k = 2 - 2 cos[(k-1) pi/N]     D1^T D1 is diagonal in the DCT-II basis
-
-so ||D1 S x||^2 = sum_k lam_k f(k)^2 c_k^2, and no N x N matrices are needed.
+Sp and w are computed as the paper writes them, one factor at a time and in the same order:
+    C^T x   the orthonormal DCT-II of x            dct(x, norm="ortho")
+    C v     the inverse transform of v             idct(v, norm="ortho")
+    S x     = C diag[f(k)] C^T x (Eq. smooth)      idct(f * dct(x))
+    D1      the (N-1) x N forward differences      forward_difference_matrix(N), a sparse matrix
+S is applied as a function rather than stored: it is a dense N x N matrix (about 0.8 GB at
+N = 10,000), whereas D1 has only 2(N - 1) non-zero entries.
 """
 import numpy as np
+from scipy import sparse
 from scipy.fft import dct, idct
 
 # Filter order O (Eq. smooth), as in S23.
@@ -18,28 +20,39 @@ O = 3
 
 
 def filter_response(N, kc):
-    """The low-pass filter's response f(k), and the eigenvalues lam_k of D1^T D1, for each DCT mode
-    k = 1..N.
-
-    f(k)  = 1 / (1 + (k/k_c)^(2O))     low-pass response (Eq. smooth)
-    lam_k = 2 - 2 cos[(k-1) pi/N]      eigenvalues of D1^T D1
+    """The low-pass filter's response f(k) = 1 / (1 + (k/k_c)^(2O)) to each DCT mode k = 1..N
+    (Eq. smooth).
 
     Args:
         N: number of samples in a profile, which is also the number of DCT modes.
         kc: filter cutoff k_c.
     Returns:
-        f: f(k) for k = 1..N, shape (N,).
-        lam: lam_k for k = 1..N, shape (N,).
+        f(k) for k = 1..N, shape (N,).
     """
     k = np.arange(1, N + 1)
-    f = 1 / (1 + (k / kc) ** (2 * O))
-    lam = 2 - 2 * np.cos((k - 1) * np.pi / N)
-    return f, lam
+    return 1 / (1 + (k / kc) ** (2 * O))
+
+
+def forward_difference_matrix(N):
+    """D1, the (N-1) x N forward-difference matrix: row r is -1 at sample r and +1 at sample r + 1,
+    so (D1 v)_r = v_(r+1) - v_r.
+
+    It is stored as a sparse matrix, which holds only its 2(N - 1) non-zero entries but multiplies
+    like an ordinary one.
+
+    Args:
+        N: number of samples in a profile.
+    Returns:
+        D1, a scipy.sparse array of shape (N - 1, N).
+    """
+    minus_ones = -np.ones(N - 1)
+    ones = np.ones(N - 1)
+    return sparse.diags_array([minus_ones, ones], offsets=[0, 1], shape=(N - 1, N))
 
 
 def smooth(I, kc):
-    """The smoothed profile S x: the profile with each DCT coefficient scaled by the low-pass filter
-    f(k) (Eq. smooth). Works on one profile or on every row of I(d_j, t).
+    """The smoothed profile S x = C diag[f(k)] C^T x (Eq. smooth). Works on one profile or on every
+    row of I(d_j, t).
 
     Args:
         I: one profile x, shape (N,), or I(d_j, t), shape (n_d, N), with row j the profile at
@@ -48,17 +61,18 @@ def smooth(I, kc):
     Returns:
         S x, the same shape as I.
     """
-    f, _ = filter_response(I.shape[-1], kc)
+    f = filter_response(I.shape[-1], kc)
 
-    # The filter multiplies each DCT coefficient by f(k); transform back to samples.
+    # C^T x: the DCT coefficients of the profile.
     c = dct(I, norm="ortho", axis=-1)
+
+    # diag[f(k)] C^T x: each coefficient times the filter's response; then C: back to samples.
     return idct(f * c, norm="ortho", axis=-1)
 
 
 def structure_parameter(I, kc):
-    """The structure parameter Sp = ||D1 S x|| (Eq. sp): the root sum of squares of the differences
-    between neighbouring samples of the smoothed profile. Works on one profile or on every row of
-    I(d_j, t).
+    """The structure parameter Sp = ||D1 S x|| (Eq. sp): the length of the forward differences of
+    the smoothed profile. Works on one profile or on every row of I(d_j, t).
 
     Args:
         I: one profile x, shape (N,), or I(d_j, t), shape (n_d, N), with row j the profile at
@@ -68,23 +82,22 @@ def structure_parameter(I, kc):
         Sp: one number per profile (a float for one profile, shape (n_d,) for I(d_j, t)), in the
         units of x.
     """
-    f, lam = filter_response(I.shape[-1], kc)
-    c = dct(I, norm="ortho", axis=-1)
+    # D1 S x, the structure vector of each profile. The profiles are the rows of S x, and a row
+    # times D1^T is that profile's D1 S x, written as a row.
+    D1 = forward_difference_matrix(I.shape[-1])
+    D1Sx = smooth(I, kc) @ D1.T
 
-    # ||D1 S x||^2 = sum_k lam_k f(k)^2 c_k^2, because S and D1^T D1 are both diagonal here.
-    Sp_squared = np.sum(lam * f**2 * c**2, axis=-1)
-    return np.sqrt(Sp_squared)
+    # Sp = ||D1 S x||.
+    return np.linalg.norm(D1Sx, axis=-1)
 
 
-def sp_gradient(I, kc):
-    """How much Sp changes per unit change in each sample of the profile: the gradient
-    w(t) = dSp/dx_t = (D1 S x)^T D1 S / Sp, the coefficients w of Eq. ahat. Works on one profile or
-    on every row of I(d_j, t).
+def coefficients(I, kc):
+    """The coefficients w = (D1 S x)^T D1 S / Sp of Eq. ahat: how much Sp changes per unit change in
+    each sample of the profile (w(t) = dSp/dx_t). Works on one profile or on every row of I(d_j, t).
 
     This is Eq. weights, w = a_hat^T D1 S, with a_hat estimated from the data as D1 S x / Sp.
-    As a column, w = S D1^T D1 S x / Sp, which in the DCT basis is IDCT(lam f^2 c) / Sp.
-    e_par = sum_t w_t n_t is then the part of the noise that changes Sp at first order
-    (Eq. weights).
+    e_par = sum_t w_t n_t is then the part of the noise that changes Sp at first order. The row
+    (D1 S x)^T D1 S is multiplied out from the left, as written.
 
     Args:
         I: one profile x, shape (N,), or I(d_j, t), shape (n_d, N), with row j the profile at
@@ -93,15 +106,21 @@ def sp_gradient(I, kc):
     Returns:
         w: the same shape as I; row j is w(t; d_j).
     """
-    f, lam = filter_response(I.shape[-1], kc)
-    c = dct(I, norm="ortho", axis=-1)
+    # The structure vector D1 S x of each profile, as a row (as in structure_parameter), and its
+    # length Sp (Eqs. smooth, sp).
+    D1 = forward_difference_matrix(I.shape[-1])
+    D1Sx = smooth(I, kc) @ D1.T
+    Sp = np.linalg.norm(D1Sx, axis=-1)
 
-    # S D1^T D1 S x in the DCT basis is lam_k f(k)^2 c_k; transform it back to samples.
-    w_times_Sp = idct(lam * f**2 * c, norm="ortho", axis=-1)
+    # (D1 S x)^T D1: the row times D1, as written (N numbers per profile).
+    u = D1Sx @ D1
+
+    # (D1 S x)^T D1 S = u S. S = C diag[f] C^T is symmetric, so the row u S holds the same numbers
+    # as the column S u^T: the smoothed u.
+    uS = smooth(u, kc)
 
     # Divide each profile's row by its own Sp.
-    Sp = structure_parameter(I, kc)
-    return w_times_Sp / np.expand_dims(Sp, -1)
+    return uS / np.expand_dims(Sp, -1)
 
 
 def kc_search(I):

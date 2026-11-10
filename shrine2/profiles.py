@@ -247,8 +247,13 @@ def channel_delays(f0, bw=336.0, nchan=NCHAN, zap=()):
     Coarse channel c is FFT bin c of a block of nchan voltage samples; SHRINE's FFT bins run down
     from the top of the band, so channel c is centred on f_max - c bw/nchan. Channel 0 is centred
     on f_max itself: its upper half lies above the band and wraps round to the bottom, so it holds
-    the top and bottom half-channels and enters as two halves of half a share each. Delays are
-    relative to f0:
+    the top and bottom half-channels and enters as two halves of half a share each. (The wrap is
+    because complex voltages sampled at a rate bw cannot tell a frequency f from f + bw.) A shift
+    of half a channel before the FFT (multiplying sample n by exp(i pi n / nchan)) would put the
+    band edge on a channel boundary instead, but SHRINE does not do that, so channel_delays models
+    what SHRINE does.
+
+    Delays are relative to f0:
         tau_nu = (1/K_DM) (1/f_nu^2 - 1/f0^2)   us per pc cm^-3, with f in MHz,
     with the sign convention I(t; d) = sum_nu I_nu(t + d tau_nu) (App. 2, Eq. epchan): a positive
     trial DM moves low frequencies earlier and high frequencies later.

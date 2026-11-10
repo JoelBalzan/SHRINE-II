@@ -161,11 +161,11 @@ they are off by default so that Monte Carlo loops stay quiet.
 | Sp(d_j) = \|\|D1 S x(d_j)\|\| at every trial DM | `structure.structure_parameter` | Eq. 4 (`eq:sp`), filter Eq. 3 (`eq:smooth`) |
 | d_max, the trial DM with the largest Sp | `j_max = argmax(Sp)` | Sec. 2.2 |
 | sigma_t^2 from the profile at d_max | `noise.noise_variance` | Sec. 3.3.2 (`sec:sigt`) |
-| w at d_max, w = (D1 S x)^T D1 S / Sp | `structure.sp_gradient` | Eq. 28 (`eq:ahat`), Eq. 19 (`eq:weights`) |
+| w at d_max, w = (D1 S x)^T D1 S / Sp | `structure.coefficients` | Eq. 28 (`eq:ahat`), Eq. 19 (`eq:weights`) |
 | sigma_S = sqrt(sum_t w_t^2 sigma_t^2) | `noise.sigma_S` | Eq. 20 (`eq:sigS`) |
 | fit window: contiguous trial DMs with Sp >= Sp_max - sigma_S | `fit.fit_window` | Sec. 3.3.3 (`sec:fit`) |
 | parabola about its vertex: d_fit, c0, c1, c2, and B | `fit.fit_parabola` | Eqs. 29, 32 (`eq:parab`, `eq:lsq`) |
-| w(t; d_j) at every trial DM in the window | `structure.sp_gradient` | Eq. 28 (`eq:ahat`) |
+| w(t; d_j) at every trial DM in the window | `structure.coefficients` | Eq. 28 (`eq:ahat`) |
 | V_jl = Cov[e_par(d_j), e_par(d_l)] | `covariance.noise_covariance` | App. 2, Eq. 41 (`eq:cov`) |
 | std[c1]^2 = sum_jl B_1j B_1l V_jl | `B[1] @ V @ B[1]` | Eq. 34 (`eq:varc1`) |
 | sigma_DM = std[c1] / \|2 c2\| | `sig_DM` | Eq. 35 (`eq:final`) |
@@ -178,9 +178,9 @@ Names used throughout:
 |---|---|---|
 | `I` | x(d_j) | profiles, one row per trial DM |
 | `d` | d_j | trial (delta-)DMs, uniformly spaced |
-| `kc`, `f`, `lam` | k_c, f(k), λ_k | filter cutoff and response, eigenvalues of D1^T D1 (k_c is a 0-based index used as the mode number in f(k), as in S23, SHRINE and the paper) |
+| `kc`, `f` | k_c, f(k) | filter cutoff and response (k_c is a 0-based index used as the mode number in f(k), as in S23, SHRINE and the paper) |
 | `Sp`, `Sp_max` | 𝒮(d_j), 𝒮_max | structure parameter |
-| `w`, `W` | w, w(t; d_j) | gradient of Sp with respect to each sample (the paper's coefficients), at one trial DM and at every trial DM in the window |
+| `w`, `W` | w, w(t; d_j) | coefficients (how much Sp changes per unit change in each sample), at one trial DM and at every trial DM in the window |
 | `sig2` | σ_t² | profile-noise variance at each sample |
 | `sig_S` | σ_𝒮 | structure parameter uncertainty |
 | `win`, `n_win` | fit window | which trial DMs are fitted, and how many |
@@ -198,7 +198,7 @@ out the zapped ones.
 
 - **Same numbers as the paper's code.** On the FIRES bursts and noise realisations behind the paper's Section 4
   (one component at S/N 15, 40 and 200, two components at S/N 40), `dm_uncertainty` returns the same d_fit, sigma_DM,
-  sigma_S and fit window as the code used for the paper, to machine precision.
+  sigma_S and fit window as the code used for the paper, to rounding (within 4 × 10⁻¹³).
 - **Same profiles as SHRINE.** `generate_profiles.py --zap 335` reproduces SHRINE's I(DM, t) from the same voltages,
   to single-precision rounding.
 - **End to end on voltages.** For 160 noise realisations of a synthetic burst in CRAFT-like X/Y voltages (with self-noise),
@@ -211,7 +211,7 @@ out the zapped ones.
   SHRINE's `maximise_sn.py`, and with SHRINE's boxcar off-by-one put back it gives the same maximum S/N to rounding
   (14 significant figures).
 - The scripts for these are in `checks/`.
-- `tests/`: Sp and w against the explicit matrices (w is the gradient of Sp), V against its definition and a
+- `tests/`: Sp and w against the explicit matrices (w is dSp/dx_t), V against its definition and a
   Monte Carlo, the parabola fit, the k_c search, a toy-burst calibration, the boxcar search against brute force,
   the one-sample DM step and the crop.
 

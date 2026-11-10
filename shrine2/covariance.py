@@ -37,11 +37,11 @@ def noise_covariance(W, sig2, dt_nu, step, share=None):
     Returns:
         V, shape (n, n), in the units of Sp squared.
     """
-    n, N = W.shape
+    n, N = W.shape # n trial DMs, N samples per profile
 
     # Zero-pad to M = 2N samples so that the lags do not wrap round.
     M = 2 * N
-    f = np.fft.rfftfreq(M)                               # Fourier frequency, cycles per sample
+    f = np.fft.rfftfreq(M) # Fourier frequency, cycles per sample
 
     # rfft keeps f >= 0 only. Each f > 0 stands for +f and -f, so it counts twice in the sum over
     # all frequencies; f = 0 and the Nyquist frequency (M is even) count once.

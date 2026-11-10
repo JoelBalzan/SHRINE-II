@@ -8,7 +8,7 @@ import numpy as np
 from .covariance import noise_covariance
 from .fit import fit_parabola, fit_window
 from .noise import filtered_noise_ratio, noise_variance, sigma_S
-from .structure import sp_gradient, structure_parameter
+from .structure import coefficients, structure_parameter
 
 
 def dm_uncertainty(I, d, kc, dt_nu, share=None, verbose=False):
@@ -55,7 +55,7 @@ def dm_uncertainty(I, d, kc, dt_nu, share=None, verbose=False):
     sig2 = noise_variance(I[j_max], kc, verbose=verbose)
 
     # w at d_max (Eq. ahat), and sigma_S (Eq. sigS).
-    w_max = sp_gradient(I[j_max], kc)
+    w_max = coefficients(I[j_max], kc)
     sig_S = sigma_S(w_max, sig2)
     if verbose:
         print(f"  sigma_S (Eq. sigS) = {sig_S:.4g}, i.e. {sig_S / Sp[j_max]:.3g} of Sp_max")
@@ -111,7 +111,7 @@ def dm_uncertainty(I, d, kc, dt_nu, share=None, verbose=False):
 
     # w(t; d_j) at every trial DM in the window (Eq. ahat), and V_jl between them (App. 2, Eq. cov).
     step = d[1] - d[0]
-    W = sp_gradient(I[win], kc)
+    W = coefficients(I[win], kc)
     V = noise_covariance(W, sig2, dt_nu, step, share)
     if verbose:
         # How strongly the noise is correlated between trial DMs, which is why V is needed.

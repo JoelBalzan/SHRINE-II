@@ -74,7 +74,7 @@ def sigma_S(w, sig2):
     (Eq. sigS).
 
     Args:
-        w: coefficients at one trial DM, shape (N,) (from structure.sp_gradient).
+        w: coefficients at one trial DM, shape (N,) (from structure.coefficients).
         sig2: sigma_t^2, shape (N,) (from noise_variance).
     Returns:
         sigma_S, a float in the units of Sp.
@@ -99,7 +99,13 @@ def filtered_noise_ratio(sig2, kc, Sp):
     Returns:
         sqrt(<||e||^2>) / Sp, a float.
     """
-    f, lam = filter_response(sig2.size, kc)
+    N = sig2.size
+    f = filter_response(N, kc)
+
+    # lam_k = 2 - 2 cos[(k-1) pi/N]: the eigenvalues of D1^T D1, whose eigenvectors are the DCT-II
+    # modes, so that trace(S D1^T D1 S) = sum_k lam_k f(k)^2.
+    k = np.arange(1, N + 1)
+    lam = 2 - 2 * np.cos((k - 1) * np.pi / N)
 
     # <||e||^2> ~ mean(sigma_t^2) sum_k lam_k f(k)^2.
     mean_square_e = np.mean(sig2) * np.sum(lam * f**2)
