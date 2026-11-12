@@ -8,6 +8,5 @@ __pycache__/
 *_summaryfile.txt
 DM.txt
 .venv/
-checks/
-tests/
 *_zap.txt
+REVIEW_NOTES.md

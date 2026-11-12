@@ -158,26 +158,26 @@ they are off by default so that Monte Carlo loops stay quiet.
 
 | Step | Code | Paper |
 |---|---|---|
-| Sp(d_j) = \|\|D1 S x(d_j)\|\| at every trial DM | `structure.structure_parameter` | Eq. 4 (`eq:sp`), filter Eq. 3 (`eq:smooth`) |
+| Sp(d_j) = \|\|D1 S x(d_j)\|\| at every trial DM | `structure.structure_parameter` | Eq. 5 (`eq:sp`), filter Eq. 4 (`eq:smooth`) |
 | d_max, the trial DM with the largest Sp | `j_max = argmax(Sp)` | Sec. 2.2 |
 | sigma_t^2 from the profile at d_max | `noise.noise_variance` | Sec. 3.3.2 (`sec:sigt`) |
-| w at d_max, w = (D1 S x)^T D1 S / Sp | `structure.coefficients` | Eq. 28 (`eq:ahat`), Eq. 19 (`eq:weights`) |
-| sigma_S = sqrt(sum_t w_t^2 sigma_t^2) | `noise.sigma_S` | Eq. 20 (`eq:sigS`) |
+| w at d_max, w = (D1 S x)^T D1 S / Sp | `structure.coefficients` | Eq. 34 (`eq:ahat`), Eq. 24 (`eq:weights`) |
+| sigma_S = sqrt(sum_t w_t^2 sigma_t^2) | `noise.sigma_S` | Eq. 26 (`eq:sigS`) |
 | fit window: contiguous trial DMs with Sp >= Sp_max - sigma_S | `fit.fit_window` | Sec. 3.3.3 (`sec:fit`) |
-| parabola about its vertex: d_fit, c0, c1, c2, and B | `fit.fit_parabola` | Eqs. 29, 32 (`eq:parab`, `eq:lsq`) |
-| w(t; d_j) at every trial DM in the window | `structure.coefficients` | Eq. 28 (`eq:ahat`) |
-| V_jl = Cov[e_par(d_j), e_par(d_l)] | `covariance.noise_covariance` | App. 2, Eq. 41 (`eq:cov`) |
-| std[c1]^2 = sum_jl B_1j B_1l V_jl | `B[1] @ V @ B[1]` | Eq. 34 (`eq:varc1`) |
-| sigma_DM = std[c1] / \|2 c2\| | `sig_DM` | Eq. 35 (`eq:final`) |
-| relative curvature error std[c2]/\|c2\| | `c2_err` | Eq. 36 (`eq:c2err`) |
-| k_c: S23's procedure and the extended search | `structure.choose_kc` | App. 1, Eqs. 37, 38 (`eq:Mk`, `eq:runmean`) |
+| parabola about its vertex: d_fit, c0, c1, c2, and B | `fit.fit_parabola` | Eqs. 35, 38 (`eq:parab`, `eq:lsq`) |
+| w(t; d_j) at every trial DM in the window | `structure.coefficients` | Eq. 34 (`eq:ahat`) |
+| V_jl = Cov[e_par(d_j), e_par(d_l)], by back-projecting w to the dynamic spectrum at d_max | `covariance.noise_covariance` | App. 2, Eqs. 45–47 (`eq:epchan`, `eq:backproj`, `eq:cov`) |
+| std[c1]^2 = sum_jl B_1j B_1l V_jl | `B[1] @ V @ B[1]` | Eq. 40 (`eq:varc1`) |
+| sigma_DM = std[c1] / \|2 c2\| | `sig_DM` | Eq. 41 (`eq:final`) |
+| relative curvature error std[c2]/\|c2\| | `c2_err` | Eq. 42 (`eq:c2err`) |
+| k_c: S23's procedure and the extended search | `structure.choose_kc` | App. 1, Eqs. 43, 44 (`eq:Mk`, `eq:runmean`) |
 
 Names used throughout:
 
 | Code | Paper | Meaning |
 |---|---|---|
 | `I` | x(d_j) | profiles, one row per trial DM |
-| `d` | d_j | trial (delta-)DMs, uniformly spaced |
+| `d` | d_j | trial (delta-)DMs |
 | `kc`, `f` | k_c, f(k) | filter cutoff and response (k_c is a 0-based index used as the mode number in f(k), as in S23, SHRINE and the paper) |
 | `Sp`, `Sp_max` | 𝒮(d_j), 𝒮_max | structure parameter |
 | `w`, `W` | w, w(t; d_j) | coefficients (how much Sp changes per unit change in each sample), at one trial DM and at every trial DM in the window |
@@ -186,7 +186,7 @@ Names used throughout:
 | `win`, `n_win` | fit window | which trial DMs are fitted, and how many |
 | `A`, `B`, `c` | A, B, c_0..c_2 | design matrix, least-squares matrix, fit parameters |
 | `d_max`, `d_fit` | d_max, d_fit | largest-Sp trial DM, vertex of the fit |
-| `dt_nu`, `share` | Δt_ν, — | channel delay per unit DM (samples), channel's share of the noise |
+| `dt_nu`, `share` | Δt_ν, s_ν | channel delay per unit DM (samples), channel's share of the noise |
 | `V` | V_jl | covariance between trial DMs |
 | `sig_DM`, `c2_err` | σ_DM, std[c₂]/\|c₂\| | DM uncertainty, curvature check |
 
@@ -196,16 +196,26 @@ out the zapped ones.
 
 ## Checks
 
-- **Same numbers as the paper's code.** On the FIRES bursts and noise realisations behind the paper's Section 4
-  (one component at S/N 15, 40 and 200, two components at S/N 40), `dm_uncertainty` returns the same d_fit, sigma_DM,
-  sigma_S and fit window as the code used for the paper, to rounding (within 4 × 10⁻¹³).
+- **Same fit as the paper's code.** On the FIRES bursts and noise realisations behind the paper's Section 4
+  (one component at S/N 15, 40 and 200, two components at S/N 40), `dm_uncertainty` returns the same d_fit, sigma_S
+  and fit window as the code used for the paper, to rounding (within 4 × 10⁻¹³). sigma_DM differs, because that code
+  used the earlier form of V, which averaged sigma_t^2 over the two trial DMs' frames (see Other notes in
+  `REVIEW_NOTES.md`): individual values differ by ±5–8% (16th–84th percentiles), but over 400 realisations per case
+  the median quoted sigma_DM changes by at most 0.5%, and its ratio to the scatter of d_fit is 0.94–1.04 with either
+  form.
+- **V against a Monte Carlo.** `checks/mc_covariance.py` draws white noise in every channel of a dynamic spectrum,
+  dedisperses it at 41 trial DMs as the data are, and compares the covariance of e_par between trial DMs with
+  `noise_covariance`. With 10,000 realisations, std[c1] predicted / Monte Carlo is 0.996 ± 0.007 (equal channels) and
+  0.998 ± 0.007 (noise variance 5 times higher at the burst's peak, unequal channels, unevenly spaced trial DMs), and the
+  correlations between trial DMs agree within their sampling errors.
 - **Same profiles as SHRINE.** `generate_profiles.py --zap 335` reproduces SHRINE's I(DM, t) from the same voltages,
   to single-precision rounding.
 - **End to end on voltages.** For 160 noise realisations of a synthetic burst in CRAFT-like X/Y voltages (with self-noise),
   run through `generate_profiles` and Section 3.3 with SHRINE's channel model, the median quoted sigma_DM is
-  1.01 ± 0.06 times the scatter of d_fit, and d_fit is unbiased. With the first and last 40 channels zapped
-  (`--zap_edges 40`) it is 1.09 ± 0.07 and 1.07 ± 0.07 in two independent sets of 110 realisations; leaving the zapped
-  channels in the channel model instead would raise sigma_DM by about 28%. The channel delays were checked against
+  1.07 ± 0.06 times the scatter of d_fit (1.04 ± 0.06 with the earlier form of V), and d_fit is unbiased. With the
+  first and last 40 channels zapped (`--zap_edges 40`) it is 1.10 ± 0.07 in 110 realisations (1.09 ± 0.07 and
+  1.07 ± 0.07 in two sets with the earlier V); leaving the zapped channels in the channel model instead would raise
+  sigma_DM by about 28%. The channel delays were checked against
   the shift that the dedispersion actually applies to each channel.
 - **S/N maximisation.** On profiles from the synthetic voltages, `maximise_sn` picks the same trial DM and range as
   SHRINE's `maximise_sn.py`, and with SHRINE's boxcar off-by-one put back it gives the same maximum S/N to rounding
@@ -221,8 +231,8 @@ out the zapped ones.
   know sigma_DM before the first run; the scripts warn if the step is coarser than sigma_DM/3 and suggest a grid for a
   rerun. A coarser step still gives d_fit, with sigma_DM from fewer trial DMs in the fit window; at least three are
   needed.
-- **Uniform trial DMs.** The trial DMs are assumed to be uniformly spaced, as every script makes them: the covariance V
-  takes the step as d[1] − d[0], and this is not checked. If you make I(DM, t) yourself, keep the step constant.
+- **Uniform trial DMs.** The covariance V does not need uniformly spaced trial DMs, but `check_trial_dms` and the
+  printed output take the step as d[1] − d[0]. If you make I(DM, t) yourself, keep the step constant.
 - **The crop.** The burst is found as the brightest 1-ms bin of the `-I` file (assumed to be at 1 µs), summed over all
   channels, unless `--force_peak` is given. A crop that would run off either end of the voltages stops with an error.
 - **Forcing k_c.** sigma_t^2 uses the DCT modes above k_min = max(N/4, 2 k_c), assumed to hold no burst power. A forced
@@ -231,9 +241,11 @@ out the zapped ones.
 - **Channel noise.** V assumes each channel carries its share of the noise. `generate_profiles` normalises every channel
   to unit standard deviation over the crop, including the burst, so very bright channels are slightly down-weighted.
   Dead or RFI-flagged channels should be zapped (`--zap`): a channel of zeros would divide by zero there.
-- **Self-noise.** sigma_t^2 is a local average from one profile, so with strong self-noise it varies from one trial DM
-  to the next, and sigma_DM for a given burst can change by tens of per cent when the trial DMs change. In the voltage
-  check above it was still unbiased on average.
+- **Self-noise.** V attaches sigma_t^2 to the samples of the dynamic spectrum at d_max, where it is measured, and
+  shifts them with their channels at the other trial DMs (paper App. 2), so a noise level that changes during the
+  burst is followed. sigma_t^2 is still a local average from one profile, so with strong self-noise it varies from one
+  trial DM to the next, and sigma_DM for a given burst can change by tens of per cent when the trial DMs change. In the
+  voltage check above it was still unbiased on average.
 - **Low S/N.** For very faint bursts use S/N maximisation (see above); the structure-maximisation scripts warn when
   sqrt(<||e||^2>)/S > 0.3 or std[c2]/|c2| > 0.5.
 - **Validity.** sigma_DM is a first-order result. The summary reports sqrt(<||e||^2>)/S (paper Section 5.2; the

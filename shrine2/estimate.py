@@ -19,12 +19,12 @@ def dm_uncertainty(I, d, kc, dt_nu, share=None, verbose=False):
     parabola and its vertex, d_fit; the noise covariance V between the trial DMs in the window;
     and from these, sigma_DM.
 
-    The trial DMs are assumed to be uniformly spaced, as every script makes them: the covariance
-    takes the step as d[1] - d[0], and this is not checked.
+    The covariance does not need uniformly spaced trial DMs, but check_trial_dms and the verbose
+    output take the step as d[1] - d[0].
 
     Args:
         I: I(d_j, t), shape (n_d, N), one row per trial DM.
-        d: the trial DMs, shape (n_d,), uniformly spaced, pc cm^-3.
+        d: the trial DMs, shape (n_d,), pc cm^-3.
         kc: filter cutoff k_c.
         dt_nu: each channel's dispersion delay per unit DM in samples, shape (n_chan,)
             (profiles.channel_delays divided by dt).
@@ -109,10 +109,10 @@ def dm_uncertainty(I, d, kc, dt_nu, share=None, verbose=False):
         print(f"  parabola about its vertex (Eqs. parab, lsq): d_fit = {d_fit:.6g}, "
               f"c0 = {c[0]:.4g}, c1 = {c[1]:.2g} (~0 about the vertex), c2 = {c[2]:.4g}")
 
-    # w(t; d_j) at every trial DM in the window (Eq. ahat), and V_jl between them (App. 2, Eq. cov).
-    step = d[1] - d[0]
+    # w(t; d_j) at every trial DM in the window (Eq. ahat), and V_jl between them (App. 2, Eq. cov),
+    # with sigma_t^2 attached to the dynamic spectrum at d_max, where it was measured.
     W = coefficients(I[win], kc)
-    V = noise_covariance(W, sig2, dt_nu, step, share)
+    V = noise_covariance(W, sig2, d[win], d[j_max], dt_nu, share)
     if verbose:
         # How strongly the noise is correlated between trial DMs, which is why V is needed.
         sd = np.sqrt(np.diag(V))
@@ -141,6 +141,7 @@ def dm_uncertainty(I, d, kc, dt_nu, share=None, verbose=False):
     c2_err = np.sqrt(var_c2) / abs(c[2])
 
     if verbose:
+        step = d[1] - d[0]
         print(f"  std[c1] (Eq. varc1) = {np.sqrt(var_c1):.4g}")
         print(f"  sigma_DM = std[c1] / |2 c2| (Eq. final) = {sig_DM:.4g} pc cm^-3 "
               f"({sig_DM / step:.3g} trial-DM steps)")

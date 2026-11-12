@@ -82,6 +82,23 @@ folded into their callers, `main` and `run_structure_maximisation`. Outputs are 
   to rounding (at most 1.9e-13 relative), not bit for bit, and with the paper's code to 4e-13. `pyproject.toml` now
   requires scipy >= 1.11 (for `scipy.sparse.diags_array`).
   `filter_response` now returns f(k) only; lam_k is computed in `noise.filtered_noise_ratio`, its one remaining use.
+- **V by back-projection (2026-11-11).** `noise_covariance(W, sig2, d, d_ref, dt_nu, share)` now writes e_par(d_j)
+  as a weighted sum of the noise samples of the dynamic spectrum dedispersed at d_ref = d_max, where sigma_t^2 is
+  measured. The weights g_j(nu, t) = w(t - (d_j - d_max) dt_nu; d_j) are w copied into every channel and shifted back
+  (the dedispersion run in reverse, with the same Fourier phase ramp), and V_jl = sum_nu s_nu sum_t sigma_t^2 g_j g_l,
+  summed one channel at a time (paper App. 2, Eqs. epchan, backproj, cov). It replaces the cross-spectrum form, which
+  averaged sigma_t^2 over the two trial DMs' frames; that is exact only for constant sigma_t^2 and wrong at first order
+  in d_j - d_max when the noise level changes during the burst. The trial DMs no longer need to be uniformly spaced
+  (the old `step` argument is gone). Checks:
+  - constant sigma_t^2: identical to the old V to rounding (2e-13) on the paper's one-component burst;
+  - true time-varying sigma_t^2 (5x the variance at the peak), against a Monte Carlo of std[c1]: new 0.96-0.97, old
+    1.02-1.03, at S/N 40 and 200 (same 1500 realisations; MC error 0.018); in `tests/test_covariance.py`'s self-noise
+    case the old form is about 10% low and the new within 1%;
+  - with sigma_t^2 estimated from each realisation (`compare_final_sdm.py` cases, 400 realisations each): median new/old
+    sigma_DM 0.995-1.002, 16th-84th percentiles ±5-8%, median quoted/MC 0.94-1.04 with either;
+  - voltages with self-noise (`mc_voltages.py 0.5 160`): 1.07 ± 0.06 (old 1.04 ± 0.06); `--zap_edges 40`, 110
+    realisations: 1.10 ± 0.07.
+  Speed: about twice the old time (0.6 s against 0.3 s for 69 trial DMs and 336 channels).
 - **Untracked tests:** `tests/` and `checks/` are listed in `.gitignore`, so they are not under version control.
   Remove those two lines to track them.
 - **Bit-level results depend on how an expression is written.** NumPy may evaluate `a * b` with the operands

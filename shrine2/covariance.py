@@ -1,53 +1,53 @@
 """The covariance of the noise between trial DMs, V_jl = Cov[e_par(d_j), e_par(d_l)].
 
-Paper: Appendix 2 (Eqs. epchan, cov).
+Paper: Appendix 2 (Eqs. epchan, backproj, cov).
 
-Dedispersing at another trial DM only shifts the channels relative to one another, by
-(d_j - d_l) dt_nu samples for channel nu, so the same channel noise appears in both profiles.
-With s_nu each channel's share of the profile-noise variance (s_nu = 1/N_nu for equal channels,
-as in Eq. cov):
+Dedispersing at another trial DM does not change the noise in any channel; it only shifts the
+channels relative to one another before they are summed. So the noise at every trial DM can be
+written in terms of one set of noise samples: n_nu(t), the noise in channel nu of the dynamic
+spectrum dedispersed at d_ref, the trial DM at which sigma_t^2 is measured (d_max). Dedispersing
+at d_j instead shifts channel nu by a further
 
-    V_jl = 1/2 sum_nu s_nu sum_t (sigma_t^2 + sigma_t'^2) w(t; d_j) w(t'; d_l),
-    t' = t + (d_j - d_l) dt_nu.
+    delta_j_nu = (d_j - d_ref) dt_nu  samples,
 
-The lags are not whole samples, so V is evaluated in the Fourier domain, where a lag is a phase
-ramp:
+so e_par(d_j) = sum_t w(t; d_j) sum_nu n_nu(t + delta_j_nu). Relabelling t in each channel,
 
-    sum_t a(t) b(t + lag) = (1/M) sum_f conj(A_f) B_f exp(2 pi i f lag),
+    e_par(d_j) = sum_nu sum_t g_j(nu, t) n_nu(t),    g_j(nu, t) = w(t - delta_j_nu; d_j)
+                                                                          (Eqs. epchan, backproj)
 
-with both series zero-padded to M = 2N samples so that the lags do not wrap round.
-The trial DMs must be uniformly spaced: then V_jl depends on the lag only through m = j - l.
+g_j is w at d_j copied into every channel and shifted by delta_j_nu: the dedispersion to d_j run
+in reverse. It is the weight of each dynamic-spectrum noise sample in e_par(d_j).
+
+If the noise is uncorrelated between samples and between channels, and channel nu carries a share
+s_nu of sigma_t^2, only products of the same sample contribute, each with that sample's variance:
+
+    V_jl = sum_nu s_nu sum_t sigma_t^2 g_j(nu, t) g_l(nu, t)    (Eq. cov),
+
+the dot product of the two weight maps, weighted by the noise variance of each sample.
+
+The shifts are fractional, so g_j is made with the same Fourier phase ramp as the dedispersion,
+with the opposite sign. The trial DMs need not be uniformly spaced.
 """
 import numpy as np
 
 
-def noise_covariance(W, sig2, dt_nu, step, share=None):
+def noise_covariance(W, sig2, d, d_ref, dt_nu, share=None):
     """The covariance of the noise in Sp between each pair of trial DMs in the fit window,
     V_jl = Cov[e_par(d_j), e_par(d_l)] (Appendix 2, Eq. cov).
 
-    The n trial DMs must be consecutive and uniformly spaced.
-
     Args:
-        W: w(t; d_j) at each trial DM in the window, shape (n, N), one row per trial DM, in order
-            of d_j.
-        sig2: sigma_t^2, shape (N,).
+        W: w(t; d_j) at each trial DM in the window, shape (n, N), one row per trial DM.
+        sig2: sigma_t^2, the profile-noise variance measured at d_ref, shape (N,).
+        d: the trial DMs of the rows of W, shape (n,), pc cm^-3.
+        d_ref: the trial DM at which sig2 was measured (d_max), pc cm^-3.
         dt_nu: each channel's dispersion delay per unit DM, in samples, shape (n_chan,).
-        step: trial-DM spacing d_(j+1) - d_j, pc cm^-3.
         share: each channel's share of the noise variance, shape (n_chan,); None for equal shares.
     Returns:
         V, shape (n, n), in the units of Sp squared.
     """
-    n, N = W.shape # n trial DMs, N samples per profile
-
-    # Zero-pad to M = 2N samples so that the lags do not wrap round.
-    M = 2 * N
-    f = np.fft.rfftfreq(M) # Fourier frequency, cycles per sample
-
-    # rfft keeps f >= 0 only. Each f > 0 stands for +f and -f, so it counts twice in the sum over
-    # all frequencies; f = 0 and the Nyquist frequency (M is even) count once.
-    n_f = np.full(f.size, 2.0)
-    n_f[0] = 1.0
-    n_f[-1] = 1.0
+    n, N = W.shape  # n trial DMs, N samples per profile
+    d = np.asarray(d, float)
+    dt_nu = np.asarray(dt_nu, float)
 
     # Each channel's share s_nu of the noise variance, normalised to sum to 1.
     if share is None:
@@ -56,30 +56,31 @@ def noise_covariance(W, sig2, dt_nu, step, share=None):
         s = np.asarray(share, float)
     s = s / s.sum()
 
-    # Transforms of sigma_t^2 w(t; d_j) and of w(t; d_j), one row per trial DM.
-    F_sw = np.fft.rfft(sig2 * W, M, axis=1)
-    F_w = np.fft.rfft(W, M, axis=1)
+    # delta_j_nu: how far dedispersing at d_j rather than d_ref shifts channel nu, in samples.
+    delay = np.outer(d - d_ref, dt_nu)  # shape (n, n_chan)
 
-    V = np.empty((n, n))
-    for m in range(n):
-        # Every pair of trial DMs m steps apart has the same lag in each channel, in samples.
-        lag = m * step * dt_nu
+    # Zero-pad w on both sides, so that the shifted copies do not wrap round: by N/2, or by more
+    # if a shift is longer. The noise variance outside the profile is taken as its value at the
+    # nearest end.
+    pad = max(N // 2, int(np.ceil(np.abs(delay).max())) + 1)
+    M = N + 2 * pad
+    W_padded = np.zeros((n, M))
+    W_padded[:, pad:pad + N] = W
+    sigma = np.sqrt(np.pad(sig2, pad, mode="edge"))
 
-        # Each channel's lag as a phase ramp over the Fourier frequencies, averaged over channels.
-        phase_ramps = np.exp(2j * np.pi * lag[:, None] * f[None, :])
-        ramp = s @ phase_ramps
+    # w(t; d_j) in the Fourier domain, where a shift is a phase ramp.
+    f = np.fft.rfftfreq(M)  # Fourier frequency, cycles per sample
+    F_w = np.fft.rfft(W_padded, axis=1)
 
-        # The pairs (j, l) with j - l = m.
-        j = np.arange(m, n)
-        l = j - m
+    V = np.zeros((n, n))
+    for nu in range(dt_nu.size):
+        # g_j(nu, t) = w(t - delta_j_nu; d_j) for every trial DM j (Eq. backproj): a shift of
+        # delta_j_nu samples later, the phase ramp exp(-2 pi i f delta_j_nu).
+        ramp = np.exp(-2j * np.pi * np.outer(delay[:, nu], f))
+        G = np.fft.irfft(F_w * ramp, M, axis=1)
 
-        # Cross-spectra with sigma_t^2 taken at t (the sample's place at d_j) and with sigma_t'^2
-        # taken at t' (its place at d_l).
-        at_t = np.conj(F_sw[j]) * F_w[l]
-        at_tp = np.conj(F_w[j]) * F_sw[l]
-
-        # Average the two, apply the lag and sum over all Fourier frequencies (1/M normalisation).
-        v = 0.5 * np.real((at_t + at_tp) * ramp * n_f).sum(axis=1) / M
-        V[j, l] = v
-        V[l, j] = v
+        # Times the noise standard deviation of each sample in this channel, sqrt(s_nu sigma_t^2),
+        # so that G @ G.T is this channel's term of Eq. cov.
+        G = G * (np.sqrt(s[nu]) * sigma)
+        V += G @ G.T
     return V
