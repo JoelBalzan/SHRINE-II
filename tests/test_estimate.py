@@ -59,7 +59,7 @@ def test_non_positive_variance_is_a_failure(monkeypatch):
     """A V that is not a valid covariance gives no sigma_DM, rather than sigma_DM = 0."""
     import shrine2.estimate
 
-    def negative_covariance(W, sig2, d, d_ref, dt_nu, share=None):
+    def negative_covariance(W, cov_n, delay, share=None):
         return -np.eye(W.shape[0])
 
     monkeypatch.setattr(shrine2.estimate, "noise_covariance", negative_covariance)

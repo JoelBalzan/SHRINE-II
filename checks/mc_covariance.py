@@ -1,5 +1,5 @@
 """Monte Carlo check of the noise covariance between trial DMs, V_jl = Cov[e_par(d_j), e_par(d_l)]
-(paper Appendix 2, Eq. cov; shrine2.covariance.noise_covariance).
+(paper Appendix 2, Eqs. covprof, cov; shrine2.covariance.noise_covariance).
 
 A synthetic scattered burst across the CRAFT band (336 x 1 MHz channels, 10-us samples) gives the
 coefficients w(t; d_j) at each trial DM. Each realisation draws white noise in every channel of the
@@ -116,7 +116,7 @@ def main():
     V_mc = np.cov(e.T)
 
     # The prediction (Appendix 2).
-    V = noise_covariance(W, sig2, d, d_ref, DT_NU, share)
+    V = noise_covariance(W, sig2, np.outer(d - d_ref, DT_NU), share)
 
     # Element by element: the largest difference relative to the largest element, and the
     # correlation coefficients.
@@ -167,7 +167,7 @@ def plot(d, d_ref, j_ref, V, V_mc, rho, rho_mc, rho_err, ratio_c1, ratio_c1_err,
 
     fig, (ax_a, ax_b) = plt.subplots(1, 2, figsize=(8, 3.4))
     x = d - d_ref
-    ax_a.plot(x, rho[j_ref], color="k", lw=1.2, label="Appendix 2 (Eq. cov)")
+    ax_a.plot(x, rho[j_ref], color="k", lw=1.2, label="Appendix 2")
     ax_a.errorbar(x, rho_mc[j_ref], yerr=rho_err[j_ref], fmt="o", ms=3, color="#dc267f",
                   label=f"Monte Carlo ({args.n_real} realisations)")
     ax_a.set_xlabel(r"$d_j-d_{\rm ref}$ [pc cm$^{-3}$]")

@@ -255,7 +255,7 @@ def channel_delays(f0, bw=336.0, nchan=NCHAN, zap=()):
 
     Delays are relative to f0:
         tau_nu = (1/K_DM) (1/f_nu^2 - 1/f0^2)   us per pc cm^-3, with f in MHz,
-    with the sign convention I(t; d) = sum_nu I_nu(t + d tau_nu) (App. 2, Eq. epchan): a positive
+    with the sign convention I(t; d) = sum_nu I_nu(t + d tau_nu) (Eq. dedisp): a positive
     trial DM moves low frequencies earlier and high frequencies later.
 
     The entries are in loop order (the two halves of channel 0 first, then the other channels kept,

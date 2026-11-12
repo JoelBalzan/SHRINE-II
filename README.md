@@ -164,13 +164,13 @@ they are off by default so that Monte Carlo loops stay quiet.
 | w at d_max, w = (D1 S x)^T D1 S / Sp | `structure.coefficients` | Eq. 34 (`eq:ahat`), Eq. 24 (`eq:weights`) |
 | sigma_S = sqrt(sum_t w_t^2 sigma_t^2) | `noise.sigma_S` | Eq. 26 (`eq:sigS`) |
 | fit window: contiguous trial DMs with Sp >= Sp_max - sigma_S | `fit.fit_window` | Sec. 3.3.3 (`sec:fit`) |
-| parabola about its vertex: d_fit, c0, c1, c2, and B | `fit.fit_parabola` | Eqs. 35, 38 (`eq:parab`, `eq:lsq`) |
+| parabola about its vertex: d_fit, c0, c1, c2, and B | `fit.fit_parabola` | Eqs. 35, 39 (`eq:parab`, `eq:lsq`) |
 | w(t; d_j) at every trial DM in the window | `structure.coefficients` | Eq. 34 (`eq:ahat`) |
-| V_jl = Cov[e_par(d_j), e_par(d_l)], by back-projecting w to the dynamic spectrum at d_max | `covariance.noise_covariance` | App. 2, Eqs. 45–47 (`eq:epchan`, `eq:backproj`, `eq:cov`) |
-| std[c1]^2 = sum_jl B_1j B_1l V_jl | `B[1] @ V @ B[1]` | Eq. 40 (`eq:varc1`) |
-| sigma_DM = std[c1] / \|2 c2\| | `sig_DM` | Eq. 41 (`eq:final`) |
-| relative curvature error std[c2]/\|c2\| | `c2_err` | Eq. 42 (`eq:c2err`) |
-| k_c: S23's procedure and the extended search | `structure.choose_kc` | App. 1, Eqs. 43, 44 (`eq:Mk`, `eq:runmean`) |
+| V_jl = w(d_j) K_jl w(d_l)^T, with K_jl = sum_nu s_nu T_jnu Cov(n) T_lnu^T (the profile noise at d_j and d_l built from the same channel noise at d_max) | `covariance.noise_covariance` | App. 2, Eqs. 46, 49 (`eq:covprof`, `eq:cov`) |
+| std[c1]^2 = sum_jl B_1j B_1l V_jl | `B[1] @ V @ B[1]` | Eq. 42 (`eq:varc1`) |
+| sigma_DM = std[c1] / \|2 c2\| | `sig_DM` | Eq. 43 (`eq:final`) |
+| relative curvature error std[c2]/\|c2\|, std[c2]^2 = b_2 V b_2^T | `c2_err` | Sec. 3.3.4 |
+| k_c: S23's procedure and the extended search | `structure.choose_kc` | App. 1, Eqs. 44, 45 (`eq:Mk`, `eq:runmean`) |
 
 Names used throughout:
 

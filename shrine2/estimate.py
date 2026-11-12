@@ -109,16 +109,18 @@ def dm_uncertainty(I, d, kc, dt_nu, share=None, verbose=False):
         print(f"  parabola about its vertex (Eqs. parab, lsq): d_fit = {d_fit:.6g}, "
               f"c0 = {c[0]:.4g}, c1 = {c[1]:.2g} (~0 about the vertex), c2 = {c[2]:.4g}")
 
-    # w(t; d_j) at every trial DM in the window (Eq. ahat), and V_jl between them (App. 2, Eq. cov),
-    # with sigma_t^2 attached to the dynamic spectrum at d_max, where it was measured.
+    # w(t; d_j) at every trial DM in the window (Eq. ahat), and V_jl between them (App. 2,
+    # Eqs. covprof, cov), with sigma_t^2 attached to the dynamic spectrum at d_max, where it was
+    # measured: dedispersing at d_j shifts channel nu by a further delta_jnu = (d_j - d_max) dt_nu.
     W = coefficients(I[win], kc)
-    V = noise_covariance(W, sig2, d[win], d[j_max], dt_nu, share)
+    delay = np.outer(d[win] - d[j_max], dt_nu)
+    V = noise_covariance(W, sig2, delay, share)
     if verbose:
         # How strongly the noise is correlated between trial DMs, which is why V is needed.
         sd = np.sqrt(np.diag(V))
         rho_neighbours = np.mean(np.diag(V, 1) / (sd[:-1] * sd[1:]))
         rho_ends = V[0, -1] / (sd[0] * sd[-1])
-        print(f"  V_jl (App. 2, Eq. cov): {n_win} x {n_win}; correlation {rho_neighbours:.4f} "
+        print(f"  V_jl (App. 2, Eqs. covprof, cov): {n_win} x {n_win}; correlation {rho_neighbours:.4f} "
               f"between neighbouring trial DMs, {rho_ends:.3g} between the window's ends")
 
     # std[c1]^2 = sum_jl B_1j B_1l V_jl (Eq. varc1), and the same for c2.
