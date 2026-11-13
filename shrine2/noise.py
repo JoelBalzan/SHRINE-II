@@ -86,11 +86,12 @@ def filtered_noise_ratio(sig2, kc, Sp):
     """The size of the filtered noise relative to the structure parameter, sqrt(<||e||^2>) / Sp: a
     check that the first-order expansion behind sigma_S and sigma_DM holds.
 
-    The expansion behind the uncertainties needs ||e|| << ||a|| (Eq. small); Section 5.2 discusses
-    where it holds (the simulations span ~0.3 at S/N 15 to ~0.07 at S/N 200). For noise
-    uncorrelated between samples, <||e||^2> = trace(D1 S diag(sigma_t^2) S D1^T)
-    ~ mean(sigma_t^2) sum_k lam_k f(k)^2 (exact for constant sigma_t^2). This is a diagnostic
-    only: it is not used in sigma_S or sigma_DM.
+    The expansion behind the uncertainties needs ||e|| << ||a|| (Eq. small). This ratio estimates
+    the typical size of ||e||/||a|| (Sec. 3.4): <||e||^2> is the mean square of e = D1 S n (Eq. ae)
+    for white noise whose variance is the mean of sigma_t^2, and the measured Sp replaces ||a||.
+    Section 5.2 discusses where it holds (the simulations span ~0.3 at S/N 15 to ~0.07 at S/N 200).
+    For that noise, <||e||^2> = mean(sigma_t^2) trace(D1 S S D1^T) = mean(sigma_t^2) sum_k lam_k f(k)^2
+    (exact for constant sigma_t^2). This is a diagnostic only: it is not used in sigma_S or sigma_DM.
 
     Args:
         sig2: sigma_t^2, shape (N,).

@@ -1,0 +1,98 @@
+[
+ {
+  "tag": "single",
+  "snr": 15,
+  "kc": 17,
+  "e_over_a": 0.3106121011210749,
+  "noise_in_burst_modes": 0.851690853789535,
+  "a_in_burst_modes": 0.9965038520242259
+ },
+ {
+  "tag": "single",
+  "snr": 25,
+  "kc": 25,
+  "e_over_a": 0.27515126701123527,
+  "noise_in_burst_modes": 0.7433029015993254,
+  "a_in_burst_modes": 0.9963165303982225
+ },
+ {
+  "tag": "single",
+  "snr": 40,
+  "kc": 28,
+  "e_over_a": 0.19668751875730747,
+  "noise_in_burst_modes": 0.7173772815945084,
+  "a_in_burst_modes": 0.9962805616074095
+ },
+ {
+  "tag": "single",
+  "snr": 70,
+  "kc": 31,
+  "e_over_a": 0.12772533780962791,
+  "noise_in_burst_modes": 0.847362803443147,
+  "a_in_burst_modes": 0.9990304083777845
+ },
+ {
+  "tag": "single",
+  "snr": 120,
+  "kc": 39,
+  "e_over_a": 0.10158531203413339,
+  "noise_in_burst_modes": 0.8068629986866165,
+  "a_in_burst_modes": 0.9993447542879231
+ },
+ {
+  "tag": "single",
+  "snr": 200,
+  "kc": 42,
+  "e_over_a": 0.06770412991511773,
+  "noise_in_burst_modes": 0.8885496045949773,
+  "a_in_burst_modes": 0.9998419934497136
+ },
+ {
+  "tag": "double",
+  "snr": 15,
+  "kc": 12,
+  "e_over_a": 0.29776984027437714,
+  "noise_in_burst_modes": 0.7774284795143893,
+  "a_in_burst_modes": 0.996032002625678
+ },
+ {
+  "tag": "double",
+  "snr": 25,
+  "kc": 16,
+  "e_over_a": 0.24718539205717666,
+  "noise_in_burst_modes": 0.8057132580712979,
+  "a_in_burst_modes": 0.9950704452591661
+ },
+ {
+  "tag": "double",
+  "snr": 40,
+  "kc": 31,
+  "e_over_a": 0.29445385293431864,
+  "noise_in_burst_modes": 0.8241825810122174,
+  "a_in_burst_modes": 0.9978933281564336
+ },
+ {
+  "tag": "double",
+  "snr": 70,
+  "kc": 36,
+  "e_over_a": 0.19856076911128803,
+  "noise_in_burst_modes": 0.7718413693638415,
+  "a_in_burst_modes": 0.9988011665381394
+ },
+ {
+  "tag": "double",
+  "snr": 120,
+  "kc": 37,
+  "e_over_a": 0.11971211048013758,
+  "noise_in_burst_modes": 0.7739097341639992,
+  "a_in_burst_modes": 0.9992859535451374
+ },
+ {
+  "tag": "double",
+  "snr": 200,
+  "kc": 41,
+  "e_over_a": 0.08181826823028801,
+  "noise_in_burst_modes": 0.7478753567584926,
+  "a_in_burst_modes": 0.9993100993587909
+ }
+]

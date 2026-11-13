@@ -78,9 +78,10 @@ def fit_parabola(d, Sp):
         (d_fit, c, B): the vertex (pc cm^-3); c = (c0, c1, c2) about d_fit, shape (3,); B, shape
         (3, n), with c_m = sum_j B_mj Sp(d_j). None if the parabola has no maximum (c2 >= 0).
     """
-    # Pass 1: about the centre of the window. A parabola that opens upwards has no maximum.
+    # Pass 1: about the centre of the window. 
     d_mid = d.mean()
     _, c_mid = parabola_least_squares(d - d_mid, Sp)
+    # A parabola that opens upwards has no maximum.
     if c_mid[2] >= 0:
         return None
 

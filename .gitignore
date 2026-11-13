@@ -10,3 +10,5 @@ DM.txt
 .venv/
 *_zap.txt
 REVIEW_NOTES.md
+# Logs of the paper's Monte Carlo runs (paper/sec4_validation/run_all.sh)
+paper/*/logs/

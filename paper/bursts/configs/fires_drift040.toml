@@ -1,0 +1,221 @@
+[meta]
+name    = "val4_drift040"
+seed    = 26
+version = 1
+
+[simulation.grid]
+f_start_MHz        = 751.5
+f_end_MHz          = 1087.5
+df_MHz             = 1.0
+t_start_ms         = -2.0
+t_end_ms           = 4.0
+dt_ms              = 0.010
+reference_freq_MHz = 1000
+
+[propagation.scattering]
+index = -4.0
+screen = "thin" # thin | thick | uniform | https://ui.adsabs.harvard.edu/abs/1972MNRAS.157...55W/abstract 
+
+[propagation.rm]
+RM = 0.0 # applied after RVM
+order = "pre" # order to apply with respect to scatter: pre | post
+
+[propagation.derotate]
+enable = true
+
+[propagation.scintillation]
+enable          = false
+timescale_s     = 300
+bandwidth_Hz    = 4e6
+derive_from_tau = false
+N_images        = 5000
+theta_extent    = 3.0
+return_field    = false
+
+[emission]
+model = "psn"
+
+[emission.rvm_swing]
+enable    = false
+alpha_deg = 45.0  # Magnetic inclination angle.
+beta_deg  = 5.0   # Impact angle.
+period_ms = 1.0   # PA swing period in time units.
+phase0_ms = 0.0   # PA swing reference phase.
+psi0_deg  = 0.0   # Baseline PA offset.
+
+[[emission.components]]
+t0_ms           = 0.0
+width_ms        = 0.15
+amplitude_Jy    = 1.0
+spectral_index  = 0.0
+tau_ms          = 0.05
+dm              = 0.0
+rm              = 0.0
+pa_deg          = 0.0
+lfrac           = 0.98
+vfrac           = -0.17
+dpa_deg_per_ms  = 0.0
+band_centre_MHz = 1030.0
+band_width_MHz  = 120.0
+
+[emission.components.microshots]
+N               = 100
+width_frac_low  = 0.05
+width_frac_high = 0.20
+
+[emission.components.microshot_scatter]
+t0_sigma_ms          = 0.0
+width_sigma_ms       = 0.0
+amplitude_sigma      = 0.0
+spectral_index_sigma = 0.0
+tau_sigma_ms         = 0.0
+dm_sigma             = 0.0
+rm_sigma             = 0.0
+pa_sigma_deg         = 20.0
+lfrac_sigma          = 0.0
+vfrac_sigma          = 0.0
+dpa_sigma            = 0.0
+band_centre_sigma    = 0.0
+band_width_sigma     = 0.0
+
+[emission.components.amplitude_distribution]
+type = "powerlaw"
+
+[emission.components.amplitude_distribution.powerlaw]
+alpha      = 3.0
+xmin_scale = 0.01
+xmax_scale = 1.0
+
+[emission.components.amplitude_distribution.lognormal]
+sigma = 0.3
+
+[emission.components.amplitude_distribution.uniform]
+low_scale  = 0.0
+high_scale = 2.0
+
+[[emission.components]]
+t0_ms           = 0.4
+width_ms        = 0.15
+amplitude_Jy    = 1.0
+spectral_index  = 0.0
+tau_ms          = 0.05
+dm              = 0.0
+rm              = 0.0
+pa_deg          = 0.0
+lfrac           = 0.98
+vfrac           = -0.17
+dpa_deg_per_ms  = 0.0
+band_centre_MHz = 920.0
+band_width_MHz  = 120.0
+
+[emission.components.microshots]
+N               = 100
+width_frac_low  = 0.05
+width_frac_high = 0.20
+
+[emission.components.microshot_scatter]
+t0_sigma_ms          = 0.0
+width_sigma_ms       = 0.0
+amplitude_sigma      = 0.0
+spectral_index_sigma = 0.0
+tau_sigma_ms         = 0.0
+dm_sigma             = 0.0
+rm_sigma             = 0.0
+pa_sigma_deg         = 20.0
+lfrac_sigma          = 0.0
+vfrac_sigma          = 0.0
+dpa_sigma            = 0.0
+band_centre_sigma    = 0.0
+band_width_sigma     = 0.0
+
+[emission.components.amplitude_distribution]
+type = "powerlaw"
+
+[emission.components.amplitude_distribution.powerlaw]
+alpha      = 3.0
+xmin_scale = 0.01
+xmax_scale = 1.0
+
+[emission.components.amplitude_distribution.lognormal]
+sigma = 0.3
+
+[emission.components.amplitude_distribution.uniform]
+low_scale  = 0.0
+high_scale = 2.0
+
+[[emission.components]]
+t0_ms           = 0.8
+width_ms        = 0.15
+amplitude_Jy    = 1.0
+spectral_index  = 0.0
+tau_ms          = 0.05
+dm              = 0.0
+rm              = 0.0
+pa_deg          = 0.0
+lfrac           = 0.98
+vfrac           = -0.17
+dpa_deg_per_ms  = 0.0
+band_centre_MHz = 810.0
+band_width_MHz  = 120.0
+
+[emission.components.microshots]
+N               = 100
+width_frac_low  = 0.05
+width_frac_high = 0.20
+
+[emission.components.microshot_scatter]
+t0_sigma_ms          = 0.0
+width_sigma_ms       = 0.0
+amplitude_sigma      = 0.0
+spectral_index_sigma = 0.0
+tau_sigma_ms         = 0.0
+dm_sigma             = 0.0
+rm_sigma             = 0.0
+pa_sigma_deg         = 20.0
+lfrac_sigma          = 0.0
+vfrac_sigma          = 0.0
+dpa_sigma            = 0.0
+band_centre_sigma    = 0.0
+band_width_sigma     = 0.0
+
+[emission.components.amplitude_distribution]
+type = "powerlaw"
+
+[emission.components.amplitude_distribution.powerlaw]
+alpha      = 3.0
+xmin_scale = 0.01
+xmax_scale = 1.0
+
+[emission.components.amplitude_distribution.lognormal]
+sigma = 0.3
+
+[emission.components.amplitude_distribution.uniform]
+low_scale  = 0.0
+high_scale = 2.0
+
+[analysis]
+buffer_fraction = 1.0
+
+[analysis.sweep]
+enable = false
+mode   = "sd"
+
+[analysis.sweep.parameter]
+component = 0
+name      = "pa_sigma_deg"
+start     = 0.0
+stop      = 45.0
+step      = 1.0
+#log_steps = false
+
+[observation]
+sefd             = 0 
+target_snr       = 0
+baseline_correct = false
+
+[numerics]
+n_cpus = 4
+nseed  = 1
+
+[output]
+directory = "output"

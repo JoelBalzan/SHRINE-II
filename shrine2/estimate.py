@@ -75,7 +75,7 @@ def dm_uncertainty(I, d, kc, dt_nu, share=None, verbose=False):
         e_ratio=filtered_noise_ratio(sig2, kc, Sp[j_max]),
     )
     if verbose:
-        print(f"  sqrt(<||e||^2>)/Sp (Eq. small, Sec. 5.2) = {out['e_ratio']:.3g}"
+        print(f"  sqrt(<||e||^2>)/Sp (Eq. small, Sec. 3.4) = {out['e_ratio']:.3g}"
               "  (first order holds for <~ 0.3)")
 
     # The fit window: the contiguous trial DMs with Sp(d_j) >= Sp_max - sigma_S (Sec. 3.3.3).
@@ -210,5 +210,5 @@ def check_trial_dms(res):
     # Filtered noise not small compared with the structure: the first-order expansion may fail.
     if res["e_ratio"] > 0.3:
         messages.append(f"sqrt(<||e||^2>)/Sp = {res['e_ratio']:.2f} > 0.3: "
-                        "the first-order expansion may fail (Sec. 5.2)")
+                        "the first-order expansion may fail (Secs. 3.4, 5.2)")
     return messages, grid

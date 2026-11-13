@@ -142,7 +142,7 @@ def run_structure_maximisation(I, d, args, zap, extra_warnings=()):
     warnings = list(extra_warnings) + kc_warnings + grid_warnings
 
     # A burst too faint for structure maximisation: the filtered noise is not small compared with
-    # the structure (sqrt(<||e||^2>)/Sp > 0.3, Sec. 5.2), or the curvature is poorly determined
+    # the structure (sqrt(<||e||^2>)/Sp > 0.3, Secs. 3.4, 5.2), or the curvature is poorly determined
     # (std[c2]/|c2| > 0.5). Point to S/N maximisation.
     faint = res["e_ratio"] > 0.3
     if res["ok"] and res["c2_err"] > 0.5:

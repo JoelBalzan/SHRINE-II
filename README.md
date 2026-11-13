@@ -194,11 +194,30 @@ Names used throughout:
 delay and noise share of each channel it sums (channel 0 straddles the band edge and enters as two halves), leaving
 out the zapped ones.
 
+## Assumptions
+
+sigma_S and sigma_DM rest on the assumptions summarised in the paper's Section 3.4 (`sec:assump`), grouped the same way
+below, with the code that relies on each and what the code reports to check it. "Reported" means the scripts print it
+and write it to the summary file. The paper's Section 4 tests them on simulated bursts.
+
+| Group | Assumption | Where the code relies on it | How to check it |
+|---|---|---|---|
+| Perturbative approximation | The filtered noise is small compared with the structure vector, \|\|e\|\| << \|\|a\|\| (`eq:small`). This justifies the first-order expansion, neglecting \|\|e_perp\|\|^2/(2 \|\|a\|\|), taking a_hat from the measured structure vector, and treating c2 as fixed | Everything after Sp; `structure.coefficients`; sigma_DM = std[c1] / \|2 c2\| | `e_ratio` = sqrt(<\|\|e\|\|^2>)/Sp (`noise.filtered_noise_ratio`: <\|\|e\|\|^2> for white noise of the mean sigma_t^2, with the measured Sp in place of \|\|a\|\|), warning above 0.3; `c2_err` = std[c2]/\|c2\|, warning above 0.5. Both reported |
+| Local shape of the structure curve | \|\|a(d)\|\| is smooth and approximately parabolic over the fit window (a local requirement: Sp(d) may have other maxima outside the window) | `fit.fit_window`, `fit.fit_parabola` | `c2_err` near 1 flags a flat or split peak; the plot of Sp(d) with the fit (`plots.plot_structure_parameter`) |
+| Noise model | The profile noise is uncorrelated between samples, with a variance sigma_t^2 that may change with t, estimated from the DCT modes above k_min = max(N/4, 2 k_c) (assumed free of burst power) over 15 samples | `noise.noise_variance`, `noise.sigma_S`, V with `cov_n = sig2` | The DCT spectrum (`plots.plot_dct_spectrum`) and the noise at d_max (`plots.plot_noise_at_d_max`); a warning when a forced k_c is below the automatic one. `noise_covariance` also takes a full N x N Cov(n) |
+| Noise model | The channels' noise is independent, each channel carries a fixed share s_nu of the profile-noise variance, and a change of trial DM only shifts the channels (for coherent dedispersion, the change of dispersion within each channel is neglected) | `covariance.noise_covariance` (`share`), `covariance.shift_rows` | `profiles.channel_delays` gives the shares of the channels SHRINE sums; zap dead or RFI channels |
+| Statistical interpretation | Gaussian noise makes d_fit +- sigma_DM a 68% interval; sigma_DM itself, a standard deviation, does not need it | — | — |
+| Statistical interpretation | sigma_DM is conditional on k_c and on the fit window, both held fixed when the noise is propagated through the fit | `dm_uncertainty(I, d, kc, ...)`; `B[1] @ V @ B[1]` | The paper's Section 4 tests choosing k_c from each data set (and the extended search, `choose_kc`) |
+
+sigma_DM (Eq. `eq:final`) does not assume that e_par(d) is linear across the fit window; only the derivative form
+(`eq:sdm`) does. sigma_DM is the statistical uncertainty about d_0, the structure-maximising DM of the noiseless burst,
+not about the dispersive DM: the two differ when the burst changes across the band (paper Sec. 5.1).
+
 ## Checks
 
-- **Same fit as the paper's code.** On the FIRES bursts and noise realisations behind the paper's Section 4
+- **Same fit as the paper's earlier code.** On the FIRES bursts and noise realisations behind the paper's Section 4
   (one component at S/N 15, 40 and 200, two components at S/N 40), `dm_uncertainty` returns the same d_fit, sigma_S
-  and fit window as the code used for the paper, to rounding (within 4 × 10⁻¹³). sigma_DM differs, because that code
+  and fit window as the code first used for the paper's simulations, to rounding (within 4 × 10⁻¹³). sigma_DM differs, because that code
   used the earlier form of V, which averaged sigma_t^2 over the two trial DMs' frames (see Other notes in
   `REVIEW_NOTES.md`): individual values differ by ±5–8% (16th–84th percentiles), but over 400 realisations per case
   the median quoted sigma_DM changes by at most 0.5%, and its ratio to the scatter of d_fit is 0.94–1.04 with either
@@ -224,6 +243,12 @@ out the zapped ones.
 - `tests/`: Sp and w against the explicit matrices (w is dSp/dx_t), V against its definition and a
   Monte Carlo, the parabola fit, the k_c search, a toy-burst calibration, the boxcar search against brute force,
   the one-sample DM step and the crop.
+
+## Paper scripts
+
+`paper/` holds the scripts behind every figure and number of the paper, with the noiseless FIRES bursts and the
+results of the paper's runs (see `paper/README.md`). They use `shrine2` throughout, so the paper's numbers come from
+this code.
 
 ## Using it on real data
 
