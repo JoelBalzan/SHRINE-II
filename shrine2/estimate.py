@@ -11,13 +11,19 @@ from .noise import filtered_noise_ratio, noise_variance, sigma_S
 from .structure import coefficients, structure_parameter
 
 
-def dm_uncertainty(I, d, kc, dt_nu, share=None, verbose=False):
+def dm_uncertainty(I, d, kc, dt_nu, share=None, cov_n=None, verbose=False):
     """The structure-maximising DM and its 1-sigma uncertainty, sigma_DM, from the profiles
     I(d_j, t): the whole of the paper's Section 3.3.
 
     In order: Sp at every trial DM; sigma_t^2 and sigma_S at the peak; the fit window; the
     parabola and its vertex, d_fit; the noise covariance V between the trial DMs in the window;
     and from these, sigma_DM.
+
+    By default the noise is taken as white, with sigma_t^2 estimated from the profile at d_max
+    (Sec. 3.3.2). For noise correlated between samples, pass its covariance as cov_n, measured
+    away from the burst (e.g. Toeplitz, from the autocovariance of off-pulse profiles, for
+    stationary noise): it then replaces diag(sigma_t^2) in sigma_S (Eq. sigSgen), in V (Eq. cov)
+    and in e_ratio, and sigma_t^2 is not estimated (Sec. 5.3).
 
     The covariance does not need uniformly spaced trial DMs, but check_trial_dms and the verbose
     output take the step as d[1] - d[0].
@@ -29,13 +35,16 @@ def dm_uncertainty(I, d, kc, dt_nu, share=None, verbose=False):
         dt_nu: each channel's dispersion delay per unit DM in samples, shape (n_chan,)
             (profiles.channel_delays divided by dt).
         share: each channel's share of the noise variance, shape (n_chan,); None for equal shares.
+        cov_n: Cov(n) of the frequency-summed profile noise, shape (N, N) (or its diagonal, shape
+            (N,)), at d_max; None to estimate sigma_t^2 from the profile (white noise).
         verbose: print each key result of Section 3.3 as it is found, with its equation.
     Returns:
         dict with
             ok, why: whether the window and fit succeeded, and why not;
             d, Sp, kc: the inputs and Sp(d_j);
             j_max, d_max, Sp_max: the trial DM with the largest Sp;
-            sig_S, sig2, e_ratio: sigma_S, sigma_t^2 and sqrt(<||e||^2>)/Sp at d_max;
+            sig_S, sig2, e_ratio: sigma_S, sigma_t^2 (the diagonal of cov_n, if given) and
+                sqrt(<||e||^2>)/Sp at d_max;
             and, when ok:
             win, n_win, d_lo, d_hi: the fit window, its size and its first and last trial DM;
             d_fit, c, B: the vertex, (c0, c1, c2) about it, and B;
@@ -51,12 +60,24 @@ def dm_uncertainty(I, d, kc, dt_nu, share=None, verbose=False):
         print(f"  Sp(d_j) (Eq. sp): largest at d_max = {d[j_max]:.6g} "
               f"(trial DM {j_max} of {d.size}), Sp_max = {Sp[j_max]:.4g}")
 
-    # sigma_t^2 from the profile at d_max (Sec. 3.3.2).
-    sig2 = noise_variance(I[j_max], kc, verbose=verbose)
+    # Cov(n): diag(sigma_t^2), with sigma_t^2 from the profile at d_max (Sec. 3.3.2), unless
+    # given (Sec. 5.3).
+    if cov_n is None:
+        sig2 = noise_variance(I[j_max], kc, verbose=verbose)
+        cov = sig2
+    else:
+        cov = np.asarray(cov_n, float)
+        if cov.shape not in [(I.shape[1],), (I.shape[1], I.shape[1])]:
+            raise ValueError(f"cov_n has shape {cov.shape}; expected ({I.shape[1]}, {I.shape[1]}) "
+                             f"or ({I.shape[1]},)")
+        sig2 = np.diag(cov).copy() if cov.ndim == 2 else cov
+        if verbose:
+            print(f"  Cov(n) given (Sec. 5.3), {'full' if cov.ndim == 2 else 'diagonal'}: variance "
+                  f"per sample {np.mean(sig2):.4g} on average; sigma_t^2 not estimated")
 
-    # w at d_max (Eq. ahat), and sigma_S (Eq. sigS).
+    # w at d_max (Eq. ahat), and sigma_S (Eq. sigSgen; Eq. sigS for white noise).
     w_max = coefficients(I[j_max], kc)
-    sig_S = sigma_S(w_max, sig2)
+    sig_S = sigma_S(w_max, cov)
     if verbose:
         print(f"  sigma_S (Eq. sigS) = {sig_S:.4g}, i.e. {sig_S / Sp[j_max]:.3g} of Sp_max")
 
@@ -72,7 +93,7 @@ def dm_uncertainty(I, d, kc, dt_nu, share=None, verbose=False):
         Sp_max=Sp[j_max],
         sig_S=sig_S,
         sig2=sig2,
-        e_ratio=filtered_noise_ratio(sig2, kc, Sp[j_max]),
+        e_ratio=filtered_noise_ratio(cov, kc, Sp[j_max]),
     )
     if verbose:
         print(f"  sqrt(<||e||^2>)/Sp (Eq. small, Sec. 3.4) = {out['e_ratio']:.3g}"
@@ -110,11 +131,11 @@ def dm_uncertainty(I, d, kc, dt_nu, share=None, verbose=False):
               f"c0 = {c[0]:.4g}, c1 = {c[1]:.2g} (~0 about the vertex), c2 = {c[2]:.4g}")
 
     # w(t; d_j) at every trial DM in the window (Eq. ahat), and V_jl between them (App. 2,
-    # Eqs. covprof, cov), with sigma_t^2 attached to the dynamic spectrum at d_max, where it was
+    # Eqs. covprof, cov), with Cov(n) attached to the dynamic spectrum at d_max, where it was
     # measured: dedispersing at d_j shifts channel nu by a further delta_jnu = (d_j - d_max) dt_nu.
     W = coefficients(I[win], kc)
     delay = np.outer(d[win] - d[j_max], dt_nu)
-    V = noise_covariance(W, sig2, delay, share)
+    V = noise_covariance(W, cov, delay, share)
     if verbose:
         # How strongly the noise is correlated between trial DMs, which is why V is needed.
         sd = np.sqrt(np.diag(V))

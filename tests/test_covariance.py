@@ -123,3 +123,23 @@ def test_matches_monte_carlo_correlated_noise():
     b1 = np.linalg.pinv(A)[1]
     assert np.allclose(V, V_mc, rtol=0.1, atol=0.05 * V.max())
     assert abs(np.sqrt(b1 @ V @ b1) / np.sqrt(b1 @ V_mc @ b1) - 1) < 0.03
+
+
+def test_circular_shifts_match_monte_carlo_at_profile_end():
+    """The shifts are circular, as the dedispersion is: with w close to the end of the profile, so that
+    the channel shifts carry part of it round to the other end, V still matches the Monte Carlo."""
+    d = np.array([-0.2, 0.0, 0.2])
+    d_ref = 0.0
+    W = np.array([np.gradient(np.exp(-0.5 * (((t - 3 - 0.5 * j + N / 2) % N - N / 2) / 3) ** 2))
+                  for j in range(d.size)])
+    sig2 = np.full(N, 1.0)
+    shifts = (d - d_ref)[:, None] * dt_nu[None, :]
+    ramp = np.exp(2j * np.pi * FR[None, None, :] * shifts[:, :, None])
+    e = []
+    for _ in range(4000):
+        n = rng.normal(size=(n_chan, N)) * np.sqrt(sig2 / n_chan)
+        x = np.fft.irfft((np.fft.rfft(n, axis=1)[None] * ramp).sum(axis=1), N)
+        e.append((W * x).sum(axis=1))
+    V_mc = np.cov(np.array(e).T)
+    V = noise_covariance(W, sig2, np.outer(d - d_ref, dt_nu))
+    assert np.allclose(V, V_mc, rtol=0.1, atol=0.05 * V.max())

@@ -1,9 +1,9 @@
 """Figure 6 (fig:fit, Section 3.3.3): the fit of Section 3.3 on the example burst.
 
 Sp(d) with Sp +- sigma_S, the level Sp_max - sigma_S, the fit window (the contiguous trial DMs
-above it), the fitted parabola and d_fit +- sigma_DM, all from shrine2.dm_uncertainty, and S23's
-interval with sigma_S in place of their uncertainty (from the peak to where Sp + sigma_S falls
-below Sp_max, interpolated between trial DMs).
+above it), the fitted parabola and d_fit +- sigma_DM, all from shrine2.dm_uncertainty, and the
+extent of the fit window at the peak (from the peak to where Sp + sigma_S falls below Sp_max,
+interpolated between trial DMs).
 
 Writes figures/fig_s23_fit.pdf and results/fig_s23_fit.json.
 
@@ -51,7 +51,7 @@ def main():
     fig, ax = plt.subplots(figsize=(3.4, 2.9))
     fig.subplots_adjust(left=0.17, right=0.97, top=0.97, bottom=0.15)
 
-    # S23's interval with sigma_S: from the peak to where Sp + sigma_S falls below Sp_max,
+    # The fit window's extent: from the peak to where Sp + sigma_S falls below Sp_max,
     # interpolated between the trial DMs either side of each end of the window.
     j_first, j_last = np.flatnonzero(win)[[0, -1]]
     level = Sp[j_max] - sig_S
@@ -61,7 +61,7 @@ def main():
     h_Sp, = ax.plot(X, Sp, color=ORNG, lw=1.6, zorder=3)
     h_band = ax.fill_between(X, Sp - sig_S, Sp + sig_S, color=ORNG, alpha=0.18, lw=0, zorder=1)
     ax.errorbar([X[j_max]], [Sp[j_max]], xerr=[[X[j_max] - x_low], [x_high - X[j_max]]], color=MAG,
-                lw=1.2, capsize=2, fmt="none", zorder=5, label=r"S23 interval with $\sigma_{\mathcal{S}}$")
+                lw=1.2, capsize=2, fmt="none", zorder=5, label=r"$\mathcal{S}+\sigma_{\mathcal{S}}\geq\mathcal{S}_{\max}$")
 
     # The parabola about its vertex, Sp ~ c0 + c1 (d - d_fit) + c2 (d - d_fit)^2, over the window.
     dd = np.linspace(res["d_lo"], res["d_hi"], 200)

@@ -160,9 +160,9 @@ they are off by default so that Monte Carlo loops stay quiet.
 |---|---|---|
 | Sp(d_j) = \|\|D1 S x(d_j)\|\| at every trial DM | `structure.structure_parameter` | Eq. 5 (`eq:sp`), filter Eq. 4 (`eq:smooth`) |
 | d_max, the trial DM with the largest Sp | `j_max = argmax(Sp)` | Sec. 2.2 |
-| sigma_t^2 from the profile at d_max | `noise.noise_variance` | Sec. 3.3.2 (`sec:sigt`) |
+| sigma_t^2 from the profile at d_max (or Cov(n) given as `cov_n`, for noise correlated between samples) | `noise.noise_variance` | Sec. 3.3.2 (`sec:sigt`); Sec. 5.3 (`sec:colnoise`) |
 | w at d_max, w = (D1 S x)^T D1 S / Sp | `structure.coefficients` | Eq. 34 (`eq:ahat`), Eq. 24 (`eq:weights`) |
-| sigma_S = sqrt(sum_t w_t^2 sigma_t^2) | `noise.sigma_S` | Eq. 26 (`eq:sigS`) |
+| sigma_S = sqrt(sum_t w_t^2 sigma_t^2), or sqrt(w Cov(n) w^T) with `cov_n` | `noise.sigma_S` | Eq. 26 (`eq:sigS`), Eq. 25 (`eq:sigSgen`) |
 | fit window: contiguous trial DMs with Sp >= Sp_max - sigma_S | `fit.fit_window` | Sec. 3.3.3 (`sec:fit`) |
 | parabola about its vertex: d_fit, c0, c1, c2, and B | `fit.fit_parabola` | Eqs. 35, 39 (`eq:parab`, `eq:lsq`) |
 | w(t; d_j) at every trial DM in the window | `structure.coefficients` | Eq. 34 (`eq:ahat`) |
@@ -204,7 +204,7 @@ and write it to the summary file. The paper's Section 4 tests them on simulated 
 |---|---|---|---|
 | Perturbative approximation | The filtered noise is small compared with the structure vector, \|\|e\|\| << \|\|a\|\| (`eq:small`). This justifies the first-order expansion, neglecting \|\|e_perp\|\|^2/(2 \|\|a\|\|), taking a_hat from the measured structure vector, and treating c2 as fixed | Everything after Sp; `structure.coefficients`; sigma_DM = std[c1] / \|2 c2\| | `e_ratio` = sqrt(<\|\|e\|\|^2>)/Sp (`noise.filtered_noise_ratio`: <\|\|e\|\|^2> for white noise of the mean sigma_t^2, with the measured Sp in place of \|\|a\|\|), warning above 0.3; `c2_err` = std[c2]/\|c2\|, warning above 0.5. Both reported |
 | Local shape of the structure curve | \|\|a(d)\|\| is smooth and approximately parabolic over the fit window (a local requirement: Sp(d) may have other maxima outside the window) | `fit.fit_window`, `fit.fit_parabola` | `c2_err` near 1 flags a flat or split peak; the plot of Sp(d) with the fit (`plots.plot_structure_parameter`) |
-| Noise model | The profile noise is uncorrelated between samples, with a variance sigma_t^2 that may change with t, estimated from the DCT modes above k_min = max(N/4, 2 k_c) (assumed free of burst power) over 15 samples | `noise.noise_variance`, `noise.sigma_S`, V with `cov_n = sig2` | The DCT spectrum (`plots.plot_dct_spectrum`) and the noise at d_max (`plots.plot_noise_at_d_max`); a warning when a forced k_c is below the automatic one. `noise_covariance` also takes a full N x N Cov(n) |
+| Noise model | The profile noise is uncorrelated between samples, with a variance sigma_t^2 that may change with t, estimated from the DCT modes above k_min = max(N/4, 2 k_c) (assumed free of burst power) over 15 samples | `noise.noise_variance`, `noise.sigma_S`, V with `cov_n = sig2` | The DCT spectrum (`plots.plot_dct_spectrum`) and the noise at d_max (`plots.plot_noise_at_d_max`); a warning when a forced k_c is below the automatic one. For noise correlated between samples, measure Cov(n) away from the burst and pass it as `dm_uncertainty(..., cov_n=...)` (N x N): it replaces sigma_t^2 in sigma_S, V and `e_ratio` (paper Sec. 5.3; with sigma_t^2 from the profile, sigma_DM was up to 3 times too small in its simulations) |
 | Noise model | The channels' noise is independent, each channel carries a fixed share s_nu of the profile-noise variance, and a change of trial DM only shifts the channels (for coherent dedispersion, the change of dispersion within each channel is neglected) | `covariance.noise_covariance` (`share`), `covariance.shift_rows` | `profiles.channel_delays` gives the shares of the channels SHRINE sums; zap dead or RFI channels |
 | Statistical interpretation | Gaussian noise makes d_fit +- sigma_DM a 68% interval; sigma_DM itself, a standard deviation, does not need it | — | — |
 | Statistical interpretation | sigma_DM is conditional on k_c and on the fit window, both held fixed when the noise is propagated through the fit | `dm_uncertainty(I, d, kc, ...)`; `B[1] @ V @ B[1]` | The paper's Section 4 tests choosing k_c from each data set (and the extended search, `choose_kc`) |
@@ -226,7 +226,7 @@ not about the dispersive DM: the two differ when the burst changes across the ba
   dedisperses it at 41 trial DMs as the data are, and compares the covariance of e_par between trial DMs with
   `noise_covariance`. With 10,000 realisations, std[c1] predicted / Monte Carlo is 0.996 ± 0.007 (equal channels) and
   0.998 ± 0.007 (noise variance 5 times higher at the burst's peak, unequal channels, unevenly spaced trial DMs), and the
-  correlations between trial DMs agree within their sampling errors.
+  correlations between trial DMs agree within their sampling errors. The paper's Appendix B.1 repeats this check on its FIRES burst (`paper/appB_cov`).
 - **Same profiles as SHRINE.** `generate_profiles.py --zap 335` reproduces SHRINE's I(DM, t) from the same voltages,
   to single-precision rounding.
 - **End to end on voltages.** For 160 noise realisations of a synthetic burst in CRAFT-like X/Y voltages (with self-noise),
@@ -280,5 +280,11 @@ this code.
 
 ## Credits
 
-SHRINE: Timothy Perrott, Adrian Sutinjo, Danica Scott, Apurba Bera, Marcin Glowacki (Sutinjo et al. 2023). The profile
-generation and k_c procedure here follow SHRINE's. Uncertainties: Balzan et al. (in prep.).
+**Paper.** SHRINE is described by [Sutinjo et al. (2023)](https://ui.adsabs.harvard.edu/abs/2023ApJ...954...37S/abstract):
+Adrian T. Sutinjo, Danica R. Scott, Clancy W. James, Marcin Glowacki, Keith W. Bannister, Hyerin Cho (조혜린),
+Cherie K. Day, Adam T. Deller, Timothy P. Perrett and Ryan M. Shannon.
+
+**Original SHRINE code** (via Marcin Glowacki). Primary code by Timothy P. Perrott, based on earlier code by Adrian Sutinjo
+and a script originally by Danica Scott, with some additions by Apurba Bera and Marcin Glowacki.
+
+The profile generation and k_c procedure here follow SHRINE's. Uncertainties: Balzan et al. (in prep.).

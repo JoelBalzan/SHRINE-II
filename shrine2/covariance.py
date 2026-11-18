@@ -8,7 +8,10 @@ Substituting the second into the first,
     V_jl = sum_nu s_nu [w(d_j) T_jnu] Cov(n) [w(d_l) T_lnu]^T,
 
 so we never form K_jl or T_jnu. w(d_j) T_jnu is w(d_j) shifted by delta_jnu, computed
-with the same Fourier phase ramp as the dedispersion. The sum over channels is done one channel
+with the same Fourier phase ramp as the dedispersion, circularly over the profile's N samples: SHRINE
+(and profiles.make_profiles) dedisperses each cropped voltage series with one FFT over the crop, and
+the paper's simulations shift each channel with a phase ramp over the window, so samples shifted past
+one end of the profile come back at the other. The sum over channels is done one channel
 at a time, so that only the shifted rows of one channel, shape (n, N), are held at once.
 """
 import numpy as np
@@ -19,7 +22,7 @@ def shift_rows(w, delay):
 
     T_jnu moves channel nu of the noise earlier by delta_jnu, so a row vector multiplied by
     it on the right moves later by the same amount: element t of w T_jnu is w(t - delta_jnu).
-    Samples shifted in from outside the profile are zero, as for T_jnu.
+    The shift is circular over the N samples, as the dedispersion is.
 
     Works on one row and many delays (w of shape (N,), delay of shape (n_chan,)), or on many
     rows with one delay each (w of shape (n, N), delay of shape (n,)).
@@ -31,10 +34,9 @@ def shift_rows(w, delay):
         the shifted rows, shape (len(delay), N).
     """
     N = w.shape[-1]
-    M = int(2 ** np.ceil(np.log2(N + np.abs(delay).max() + 1)))  # zero-pad so nothing wraps
-    f = np.fft.rfftfreq(M)                                       # cycles per sample
-    ramp = np.exp(-2j * np.pi * delay[:, None] * f)              # delay by delta_jnu
-    return np.fft.irfft(np.fft.rfft(w, M, axis=-1) * ramp, M, axis=-1)[:, :N]
+    f = np.fft.rfftfreq(N)                           # cycles per sample
+    ramp = np.exp(-2j * np.pi * delay[:, None] * f)  # delay by delta_jnu, circularly
+    return np.fft.irfft(np.fft.rfft(w, axis=-1) * ramp, N, axis=-1)
 
 
 def noise_covariance(W, cov_n, delay, share=None):

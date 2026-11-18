@@ -1,0 +1,94 @@
+{
+ "tag": "double",
+ "snr": 15,
+ "n_real": 500,
+ "kc_pilot": 12,
+ "floor_ratio_at_kc": 1.9014965341374153,
+ "floor_ratio_k10_30": 1.475279865520959,
+ "rules": {
+  "s23": {
+   "n_failed": 0,
+   "kc_median": 12.0,
+   "kc_p16": 11.0,
+   "kc_p84": 14.0,
+   "kc_min": 9,
+   "kc_max": 17,
+   "std_d0": 0.003666157691207498,
+   "median_sig_DM": 0.029174994434333364,
+   "std_d0_over_sig": 0.12566095597581795,
+   "frac_differs_from_s23": 0.0
+  },
+  "ext": {
+   "n_failed": 0,
+   "kc_median": 12.0,
+   "kc_p16": 11.0,
+   "kc_p84": 14.0,
+   "kc_min": 9,
+   "kc_max": 17,
+   "std_d0": 0.003666157691207498,
+   "median_sig_DM": 0.029174994434333364,
+   "std_d0_over_sig": 0.12566095597581795,
+   "frac_differs_from_s23": 0.0
+  },
+  "sim": {
+   "n_failed": 0,
+   "kc_median": 23.0,
+   "kc_p16": 17.0,
+   "kc_p84": 32.0,
+   "kc_min": 14,
+   "kc_max": 57,
+   "std_d0": 0.009894697526803586,
+   "median_sig_DM": 0.0213564215129307,
+   "std_d0_over_sig": 0.46331252269078094,
+   "frac_differs_from_s23": 1.0
+  },
+  "off": {
+   "n_failed": 0,
+   "kc_median": 25.0,
+   "kc_p16": 17.0,
+   "kc_p84": 34.0,
+   "kc_min": 13,
+   "kc_max": 65,
+   "std_d0": 0.010373443075848738,
+   "median_sig_DM": 0.020640409211889334,
+   "std_d0_over_sig": 0.5025793320935422,
+   "frac_differs_from_s23": 1.0
+  },
+  "sim_z1": {
+   "n_failed": 0,
+   "kc_median": 17.0,
+   "kc_p16": 15.0,
+   "kc_p84": 22.0,
+   "kc_min": 13,
+   "kc_max": 35,
+   "std_d0": 0.008511786618142675,
+   "median_sig_DM": 0.025808196283725986,
+   "std_d0_over_sig": 0.3298094343582623,
+   "frac_differs_from_s23": 1.0
+  },
+  "sim_z2": {
+   "n_failed": 0,
+   "kc_median": 14.0,
+   "kc_p16": 14.0,
+   "kc_p84": 17.0,
+   "kc_min": 11,
+   "kc_max": 28,
+   "std_d0": 0.0055865241910779875,
+   "median_sig_DM": 0.02828041142663572,
+   "std_d0_over_sig": 0.1975404143454701,
+   "frac_differs_from_s23": 0.992
+  },
+  "sim_z3": {
+   "n_failed": 0,
+   "kc_median": 14.0,
+   "kc_p16": 13.0,
+   "kc_p84": 15.0,
+   "kc_min": 11,
+   "kc_max": 24,
+   "std_d0": 0.003913260296446024,
+   "median_sig_DM": 0.02828041142663572,
+   "std_d0_over_sig": 0.13837352778963977,
+   "frac_differs_from_s23": 0.924
+  }
+ }
+}

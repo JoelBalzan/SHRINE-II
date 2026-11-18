@@ -1,0 +1,10 @@
+{
+ "N": 601,
+ "k_min": 150,
+ "ratio_interior_max_dev": 0.015279335873856104,
+ "ratio_first_sample_dev": -0.29765257564020664,
+ "row_fraction_within_3": 0.9027759873209424,
+ "bump5_max_rel_err": 0.03176937128402546,
+ "bump5_est15_over_true_peak": 0.7686432380119,
+ "bump5_avg15_only_over_true_peak": 0.7813732904344292
+}

@@ -1,0 +1,134 @@
+{
+ "double_snr40": {
+  "default": {
+   "frac_differs": 0.0,
+   "kc_median": 30.0,
+   "scatter_about_d0kc_over_median_sig": 1.0377386747113027,
+   "scatter_about_fixed_d0_over_fixed_scatter": 1.04999403481659
+  },
+  "n_sig=3": {
+   "frac_differs": 0.017,
+   "kc_median": 30.0,
+   "scatter_about_d0kc_over_median_sig": 1.0366761141858276,
+   "scatter_about_fixed_d0_over_fixed_scatter": 1.0277270882428329
+  },
+  "n_sig=5": {
+   "frac_differs": 0.019,
+   "kc_median": 30.0,
+   "scatter_about_d0kc_over_median_sig": 1.036195204350509,
+   "scatter_about_fixed_d0_over_fixed_scatter": 1.079805835529651
+  },
+  "n_mean=4": {
+   "frac_differs": 0.849,
+   "kc_median": 29.0,
+   "scatter_about_d0kc_over_median_sig": 1.035835110435272,
+   "scatter_about_fixed_d0_over_fixed_scatter": 1.0631061011064482
+  },
+  "n_mean=8": {
+   "frac_differs": 0.825,
+   "kc_median": 31.0,
+   "scatter_about_d0kc_over_median_sig": 1.0337627987747615,
+   "scatter_about_fixed_d0_over_fixed_scatter": 1.0400933272448138
+  },
+  "reach=1.5": {
+   "frac_differs": 0.007,
+   "kc_median": 30.0,
+   "scatter_about_d0kc_over_median_sig": 1.033146212149092,
+   "scatter_about_fixed_d0_over_fixed_scatter": 1.0626548931003257
+  },
+  "reach=3": {
+   "frac_differs": 0.0,
+   "kc_median": 30.0,
+   "scatter_about_d0kc_over_median_sig": 1.0377386747113027,
+   "scatter_about_fixed_d0_over_fixed_scatter": 1.04999403481659
+  }
+ },
+ "double_snr25": {
+  "default": {
+   "frac_differs": 0.0,
+   "kc_median": 15.5,
+   "scatter_about_d0kc_over_median_sig": 1.0286611337430145,
+   "scatter_about_fixed_d0_over_fixed_scatter": 1.0562849320626897
+  },
+  "n_sig=3": {
+   "frac_differs": 0.044,
+   "kc_median": 16.0,
+   "scatter_about_d0kc_over_median_sig": 1.0154127017705992,
+   "scatter_about_fixed_d0_over_fixed_scatter": 1.0539200547732455
+  },
+  "n_sig=5": {
+   "frac_differs": 0.012,
+   "kc_median": 15.0,
+   "scatter_about_d0kc_over_median_sig": 1.0345424360152655,
+   "scatter_about_fixed_d0_over_fixed_scatter": 1.0607835491205275
+  },
+  "n_mean=4": {
+   "frac_differs": 0.856,
+   "kc_median": 14.0,
+   "scatter_about_d0kc_over_median_sig": 1.040456443440689,
+   "scatter_about_fixed_d0_over_fixed_scatter": 1.1132300641024926
+  },
+  "n_mean=8": {
+   "frac_differs": 0.87,
+   "kc_median": 16.0,
+   "scatter_about_d0kc_over_median_sig": 1.005456956256413,
+   "scatter_about_fixed_d0_over_fixed_scatter": 1.0076577270911664
+  },
+  "reach=1.5": {
+   "frac_differs": 0.008,
+   "kc_median": 15.0,
+   "scatter_about_d0kc_over_median_sig": 1.0347377095434518,
+   "scatter_about_fixed_d0_over_fixed_scatter": 1.0612692886035606
+  },
+  "reach=3": {
+   "frac_differs": 0.0,
+   "kc_median": 15.5,
+   "scatter_about_d0kc_over_median_sig": 1.0286611337430145,
+   "scatter_about_fixed_d0_over_fixed_scatter": 1.0562849320626897
+  }
+ },
+ "single_snr40": {
+  "default": {
+   "frac_differs": 0.0,
+   "kc_median": 28.0,
+   "scatter_about_d0kc_over_median_sig": 1.035904440966095,
+   "scatter_about_fixed_d0_over_fixed_scatter": 1.0246791877883648
+  },
+  "n_sig=3": {
+   "frac_differs": 0.001,
+   "kc_median": 28.0,
+   "scatter_about_d0kc_over_median_sig": 1.0357703888911445,
+   "scatter_about_fixed_d0_over_fixed_scatter": 1.0250429159573051
+  },
+  "n_sig=5": {
+   "frac_differs": 0.0,
+   "kc_median": 28.0,
+   "scatter_about_d0kc_over_median_sig": 1.035904440966095,
+   "scatter_about_fixed_d0_over_fixed_scatter": 1.0246791877883648
+  },
+  "n_mean=4": {
+   "frac_differs": 0.886,
+   "kc_median": 26.0,
+   "scatter_about_d0kc_over_median_sig": 1.0401103763084094,
+   "scatter_about_fixed_d0_over_fixed_scatter": 1.0236713553535315
+  },
+  "n_mean=8": {
+   "frac_differs": 0.821,
+   "kc_median": 29.0,
+   "scatter_about_d0kc_over_median_sig": 1.0274940267963746,
+   "scatter_about_fixed_d0_over_fixed_scatter": 1.0323324588157414
+  },
+  "reach=1.5": {
+   "frac_differs": 0.0,
+   "kc_median": 28.0,
+   "scatter_about_d0kc_over_median_sig": 1.035904440966095,
+   "scatter_about_fixed_d0_over_fixed_scatter": 1.0246791877883648
+  },
+  "reach=3": {
+   "frac_differs": 0.0,
+   "kc_median": 28.0,
+   "scatter_about_d0kc_over_median_sig": 1.035904440966095,
+   "scatter_about_fixed_d0_over_fixed_scatter": 1.0246791877883648
+  }
+ }
+}
