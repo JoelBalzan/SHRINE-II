@@ -1,4 +1,4 @@
-"""Figure 9 (fig:s23_drift, Section 5.1): structure maximisation for drifting sub-bursts.
+"""Figure 8 (fig:s23_drift, Section 5.2): structure maximisation for drifting sub-bursts.
 
 (a, b) the noiseless dynamic spectrum and profile of the t_sep = 0.2 ms burst at the true DM (a) and
 at d_0 for k_c set at S/N = 40 (b); (c) Sp(d) for t_sep = 0.35 ms with k_c set at S/N = 15 and 200;
@@ -42,10 +42,10 @@ def main():
 
     set_pub_col(1)
     set_pub_style(use_latex=False)
-    fig = plt.figure(figsize=(7.1, 5.6))
+    fig = plt.figure(figsize=(7.1, 4.2))  # 2x2 kept, about 30% shorter than before, to take less of the page
     fig.set_layout_engine("none")  # manual layout, so that each profile and dynamic spectrum touch
-    gs = fig.add_gridspec(2, 2, height_ratios=[1.32, 1.15], hspace=0.36, wspace=0.26, left=0.09,
-                          right=0.99, top=0.95, bottom=0.09)
+    gs = fig.add_gridspec(2, 2, height_ratios=[1.32, 1.15], hspace=0.55, wspace=0.26, left=0.09,
+                          right=0.99, top=0.94, bottom=0.11)
     vmax = np.percentile(I0, 99.8)
 
     # (a, b) at the true DM and at d_0.
@@ -86,7 +86,7 @@ def main():
     ax.set_xlabel(r"$d-\mathrm{DM}_\mathrm{true}$ [pc cm$^{-3}$]")
     ax.set_ylabel(r"$\mathcal{S}(d)/\max\mathcal{S}$")
     ax.set_title(r"(c) Structure curve, $t_{\rm sep}=0.35$ ms", loc="left")
-    ax.legend(loc="lower center", fontsize=8)
+    ax.legend(loc="lower left", fontsize=8)
     ax.grid(True, lw=0.5, alpha=0.5)
 
     # (d) d_0 against t_sep.

@@ -1,9 +1,9 @@
-"""Figure 7 (fig:s23_val, Section 4): validation on the simulated bursts.
+"""Figure 7 (fig:s23_val, Section 4.1): validation on the simulated bursts.
 
 (a, b) the distribution of d_fit - d_0 over the realisations at S/N = 40 for one (a) and two (b)
 components (insets: the noiseless frequency-summed profiles), with the median S23 interval, the median
 sigma_S crossing range and a Gaussian of width the median quoted sigma_DM;
-(c, d) the median quoted uncertainty of the DM (c) and of Sp (d) divided by the Monte Carlo scatter,
+(c, d) the median quoted uncertainty of the DM (c) and of Sp (d) divided by the scatter over the realisations (sigma(d_fit) for the DM, sigma(S)/<S> for S),
 against S/N, for this work, the sigma_S crossing range (c only) and S23. Arrows mark S23 intervals that
 reached the end of their trial DMs in more than 5% of realisations (lower limits).
 From the results of run_mc.py, through summarise.case_numbers.
@@ -118,9 +118,9 @@ def ratio_panel(ax, rows_by_tag, quantity, title):
     ax.grid(True, which="major", lw=0.5, alpha=0.5)
     ax.set_xlabel("S/N")
     if quantity == "dm":
-        ax.set_ylabel(r"$\sigma_{\rm DM}/\sigma_{\rm MC}$")
+        ax.set_ylabel(r"$\sigma_{\rm DM}/\sigma(d_{\rm fit})$")
     else:
-        ax.set_ylabel(r"$\sigma_{\mathcal{S}}/\sigma_{\rm MC}$")
+        ax.set_ylabel(r"$(\sigma_{\mathcal{S}}/\mathcal{S})\,/\,[\sigma(\mathcal{S})/\langle\mathcal{S}\rangle]$")
     ax.set_title(title, loc="left")
 
 
@@ -134,7 +134,7 @@ def main():
 
     set_pub_col(1)
     set_pub_style(use_latex=False)
-    fig, axs = plt.subplots(2, 2, figsize=pub_grid_figsize(n_rows=2, ncol=1, row_height=3.0))
+    fig, axs = plt.subplots(2, 2, figsize=pub_grid_figsize(n_rows=2, ncol=1, row_height=2.1))  # rows 30% shorter than before, to take less of the page
     a = hist_panel(axs[0, 0], "single", "(a) One component, S/N = 40")
     b = hist_panel(axs[0, 1], "double", "(b) Two components, S/N = 40", legend=False)
     ratio_panel(axs[1, 0], rows_by_tag, "dm", "(c) DM uncertainty")

@@ -33,7 +33,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 from plotting import IBM_PALETTE, savefig, set_pub_col, set_pub_style  # noqa: E402
 
-MC = IBM_PALETTE[2]  # Monte Carlo (magenta)
+MC = IBM_PALETTE[3]  # Monte Carlo (orange)
 CASES = [("white", "white"), ("selfnoise", "self-noise")]
 
 
@@ -69,7 +69,7 @@ def main():
         ax = axs[0, col]
         ax.plot(x, rho, color="k", lw=1.0, label="Predicted", zorder=1)
         ax.errorbar(x, rho_mc, yerr=np.clip(1 - rho**2, 0, None) / np.sqrt(n), fmt="o", ms=2.2, color=MC,
-                    elinewidth=0.8, label="Monte Carlo", zorder=2)
+                    elinewidth=0.8, label="MC", zorder=2)
         ax.set_title(f"({'ab'[col]}) {title}", loc="left")
         if col == 0:
             ax.set_ylabel(r"Corr$[e_\parallel(d_j),\,e_\parallel(d_{\rm ref})]$")

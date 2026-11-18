@@ -1,4 +1,4 @@
-"""Figure 8 (fig:s23_range, Section 4): the example burst dedispersed to the edges of each interval.
+"""Figure 11 (fig:s23_range, Appendix C, cited in Section 4.1): the example burst dedispersed to the edges of each interval.
 
 The example burst (one-component burst, S/N = 40, seed sims.EXAMPLE_SEED) dedispersed to the lower
 edge, optimum and upper edge of
